@@ -1,0 +1,79 @@
+name: data-pipeline-debugger
+version: "1.0.0"
+description: >
+  An OpenEnv environment that simulates real-world data pipeline debugging.
+  Agents must diagnose and fix broken ETL pipelines by inspecting data samples,
+  identifying anomalies, applying transformations, and validating output quality.
+  This mirrors what data engineers do daily: trace bugs through multi-stage
+  pipelines involving schema mismatches, encoding errors, type coercions,
+  missing values, and business-rule violations.
+
+author: OpenEnv Data Pipeline Debugger
+license: MIT
+tags:
+  - openenv
+  - data-engineering
+  - debugging
+  - etl
+  - real-world
+
+tasks:
+  - id: task_easy_schema_fix
+    name: "Schema Mismatch Fix"
+    difficulty: easy
+    description: >
+      The pipeline receives a CSV with wrong column types. Agent must identify
+      mismatched columns and apply correct type casts to make the schema valid.
+    max_steps: 10
+    reward_range: [0.0, 1.0]
+
+  - id: task_medium_data_quality
+    name: "Data Quality Remediation"
+    difficulty: medium
+    description: >
+      A multi-source ingestion pipeline has null values, outliers, and duplicate
+      records. Agent must apply a sequence of cleaning operations in the correct
+      order to meet downstream quality thresholds.
+    max_steps: 20
+    reward_range: [0.0, 1.0]
+
+  - id: task_hard_pipeline_orchestration
+    name: "Full Pipeline Orchestration Debug"
+    difficulty: hard
+    description: >
+      A 5-stage pipeline (ingest → validate → transform → enrich → load) has
+      multiple interconnected bugs. Agent must diagnose each stage, apply fixes
+      in dependency order, and meet strict SLA thresholds on completeness,
+      accuracy, and latency.
+    max_steps: 40
+    reward_range: [0.0, 1.0]
+
+observation_space:
+  type: object
+  description: "Current pipeline state visible to the agent"
+  fields:
+    task_id: string
+    step_count: integer
+    pipeline_stage: string
+    data_sample: "list[dict]"
+    schema_info: "dict[str, str]"
+    error_log: "list[str]"
+    metrics: "dict[str, float]"
+    available_actions: "list[str]"
+    hint: string
+
+action_space:
+  type: object
+  description: "Actions the agent can take to debug/fix the pipeline"
+  fields:
+    action_type: "enum[inspect, cast_column, drop_nulls, fill_nulls, drop_duplicates, filter_outliers, rename_column, reorder_stages, apply_business_rule, validate, submit]"
+    column: "str | null"
+    value: "str | null"
+    parameters: "dict | null"
+
+api:
+  reset: "POST /reset"
+  step: "POST /step"
+  state: "GET /state"
+  tasks: "GET /tasks"
+  health: "GET /health"

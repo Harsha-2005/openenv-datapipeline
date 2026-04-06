@@ -1,0 +1,192 @@
+# ============================================================
+# OpenEnv Data Pipeline Debugger — .gitignore
+# ============================================================
+
+# ------------------------------------------------------------
+# Python
+# ------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.conda/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+wheels/
+*.whl
+MANIFEST
+
+# Unit test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+nosetests.xml
+test-results/
+
+# MyPy / type checkers
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# ------------------------------------------------------------
+# Environment & Secrets  ← MOST IMPORTANT — never commit these
+# ------------------------------------------------------------
+.env
+.env.*
+.env.local
+.env.production
+.env.staging
+*.env
+secrets.yaml
+secrets.json
+credentials.json
+
+# ------------------------------------------------------------
+# Logs & Debug output
+# ------------------------------------------------------------
+*.log
+debug.log
+debug*.log
+logs/
+baseline_output.txt
+inference_output.txt
+*.out
+
+# ------------------------------------------------------------
+# IDE & Editor files
+# ------------------------------------------------------------
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# PyCharm / JetBrains
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*#
+.#*
+
+# ------------------------------------------------------------
+# OS generated files
+# ------------------------------------------------------------
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+.AppleDouble
+.LSOverride
+Icon?
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ------------------------------------------------------------
+# Docker
+# ------------------------------------------------------------
+.dockerignore
+docker-compose.override.yml
+*.dockertmp
+
+# ------------------------------------------------------------
+# HuggingFace / ML artifacts
+# ------------------------------------------------------------
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+*.pt
+*.pth
+*.onnx
+*.safetensors
+model_cache/
+.cache/
+huggingface_cache/
+
+# ------------------------------------------------------------
+# Data files (generated — never commit raw data)
+# ------------------------------------------------------------
+data/
+datasets/
+*.csv
+*.parquet
+*.json.gz
+*.jsonl
+*.arrow
+
+# ------------------------------------------------------------
+# Temporary / scratch files
+# ------------------------------------------------------------
+tmp/
+temp/
+scratch/
+*.tmp
+*.bak
+*.backup
+*.orig
+
+# ------------------------------------------------------------
+# ZIP / archive files (use git releases instead)
+# ------------------------------------------------------------
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
