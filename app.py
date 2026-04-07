@@ -47,8 +47,12 @@ _env = DataPipelineEnv(seed=42)
 # ---------------------------------------------------------------------------
 
 class ResetRequest(BaseModel):
-    task_id: str = "task_easy_schema_fix"
+    task_id: Optional[str] = "task_easy_schema_fix"
     seed:    Optional[int] = 42
+
+    class Config:
+        # Allow empty body {} or no body at all
+        extra = "allow"
 
 
 class StepRequest(BaseModel):
@@ -74,10 +78,15 @@ def list_tasks():
 
 
 @app.post("/reset")
-def reset(req: ResetRequest):
-    """Reset the environment for a given task. Returns initial Observation."""
+def reset(req: Optional[ResetRequest] = None):
+    """Reset the environment for a given task. Returns initial Observation.
+    Accepts empty body {}, no body, or {task_id, seed}.
+    """
     try:
-        obs = _env.reset(task_id=req.task_id, seed=req.seed)
+        task_id = (req.task_id if req and req.task_id else None) or "task_easy_schema_fix"
+        seed    = (req.seed    if req and req.seed    is not None else None)
+        seed    = seed if seed is not None else 42
+        obs = _env.reset(task_id=task_id, seed=seed)
         return obs.dict()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
