@@ -16,9 +16,9 @@ from __future__ import annotations
 import json, os, re, sys, time, traceback
 from typing import Any, Dict, List, Optional
 from openai import OpenAI
-# from dotenv import load_dotenv
+from dotenv import load_dotenv
 
-# load_dotenv()
+load_dotenv()
 
 
 # ---------------------------------------------------------------------------
