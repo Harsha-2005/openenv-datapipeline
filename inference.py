@@ -16,16 +16,16 @@ from __future__ import annotations
 import json, os, re, sys, time, traceback
 from typing import Any, Dict, List, Optional
 from openai import OpenAI
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 
-load_dotenv()
+# load_dotenv()
 
 
 # ---------------------------------------------------------------------------
 # Configuration — all from environment variables
 # ---------------------------------------------------------------------------
-API_BASE_URL = os.environ.get("API_BASE_URL")
-MODEL_NAME   = os.environ.get("MODEL_NAME")
+API_BASE_URL = os.environ.get("API_BASE_URL","https://router.huggingface.co/v1")
+MODEL_NAME   = os.environ.get("MODEL_NAME","Qwen/Qwen2.5-72B-Instruct")
 HF_TOKEN     = os.environ.get("HF_TOKEN")
 ENV_BASE_URL = os.environ.get("ENV_BASE_URL", "http://localhost:7860")
 TASKS        = ["task_easy_schema_fix","task_medium_data_quality","task_hard_pipeline_orchestration"]
