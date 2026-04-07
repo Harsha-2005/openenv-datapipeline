@@ -1,0 +1,51 @@
+version = 1
+requires-python = ">=3.11"
+
+[[package]]
+name = "openenv-datapipeline"
+version = "1.0.0"
+source = { editable = "." }
+dependencies = [
+  { name = "fastapi" },
+  { name = "uvicorn", extra = ["standard"] },
+  { name = "pydantic" },
+  { name = "openai" },
+  { name = "pyyaml" },
+  { name = "httpx" },
+  { name = "openenv-core" },
+]
+
+[[package]]
+name = "fastapi"
+version = "0.115.0"
+source = { registry = "https://pypi.org/simple" }
+
+[[package]]
+name = "uvicorn"
+version = "0.30.6"
+source = { registry = "https://pypi.org/simple" }
+
+[[package]]
+name = "pydantic"
+version = "2.9.2"
+source = { registry = "https://pypi.org/simple" }
+
+[[package]]
+name = "openai"
+version = "1.51.0"
+source = { registry = "https://pypi.org/simple" }
+
+[[package]]
+name = "pyyaml"
+version = "6.0.2"
+source = { registry = "https://pypi.org/simple" }
+
+[[package]]
+name = "httpx"
+version = "0.27.2"
+source = { registry = "https://pypi.org/simple" }
+
+[[package]]
+name = "openenv-core"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
