@@ -351,8 +351,10 @@ def run_task(task_id: str) -> Dict[str, Any]:
 
 def _grade_from_obs(obs: Dict) -> float:
     m = obs.get("metrics", {})
-    return round((m.get("completeness",0) + m.get("uniqueness",0) +
-                  m.get("validity",0)     + m.get("accuracy",0)) / 4, 4)
+    raw = (m.get("completeness",0) + m.get("uniqueness",0) +
+           m.get("validity",0)     + m.get("accuracy",0)) / 4
+    # Clip to strictly open interval (0, 1) — 0.0 and 1.0 not allowed
+    return round(min(0.999, max(0.001, raw)), 4)
 
 # ---------------------------------------------------------------------------
 # Entry point
