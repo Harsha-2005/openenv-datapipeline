@@ -423,3 +423,13 @@ TASK_INFO = [
         "max_steps":  40,
     },
 ]
+
+# ---------------------------------------------------------------------------
+# Register extra tasks (very_hard + expert) — imported from extra_tasks.py
+# ---------------------------------------------------------------------------
+try:
+    from tasks.extra_tasks import EXTRA_TASK_BUILDERS, EXTRA_TASK_INFO
+    TASK_BUILDERS.update(EXTRA_TASK_BUILDERS)
+    TASK_INFO.extend(EXTRA_TASK_INFO)
+except ImportError:
+    pass  # extra tasks are optional — base 3 tasks always available

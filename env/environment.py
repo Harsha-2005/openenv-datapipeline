@@ -19,6 +19,12 @@ from tasks.definitions import (
     _compute_metrics, HARD_STAGE_ORDER_CORRECT, HARD_WRONG_STAGE_ORDER,
 )
 
+# Extra task rules (very_hard + expert)
+try:
+    from tasks.extra_tasks import EXTRA_RULES
+except ImportError:
+    EXTRA_RULES = {}
+
 
 # ---------------------------------------------------------------------------
 # Environment
@@ -559,10 +565,20 @@ class DataPipelineEnv:
             rules = None
         elif task == "task_medium_data_quality":
             rules = MEDIUM_RULES
-        else:
+        elif task == "task_hard_pipeline_orchestration":
             rules = HARD_RULES
+        else:
+            # very_hard and expert tasks
+            rules = EXTRA_RULES.get(task, HARD_RULES)
         state.metrics = _compute_metrics(state.data, state.schema_info, rules)
-        # SLA penalty for hard task: more bugs left → higher latency
-        if task == "task_hard_pipeline_orchestration":
+        # SLA latency increases with unfixed bugs for hard/veryhard/expert tasks
+        if task in ("task_hard_pipeline_orchestration",
+                    "task_veryhard_streaming_pipeline",
+                    "task_expert_multi_source_join"):
             unfixed = sum(1 for v in state.bugs_fixed.values() if not v)
-            state.metrics.sla_latency_ms = round(30 + unfixed * 25.0, 2)
+            base_latency = {
+                "task_hard_pipeline_orchestration":  30,
+                "task_veryhard_streaming_pipeline":   50,
+                "task_expert_multi_source_join":       40,
+            }.get(task, 30)
+            state.metrics.sla_latency_ms = round(base_latency + unfixed * 20.0, 2)

@@ -129,3 +129,78 @@ def grade(state: PipelineState) -> float:
     if grader is None:
         raise ValueError(f"No grader registered for task_id={state.task_id!r}")
     return grader(state)
+
+
+# ---------------------------------------------------------------------------
+# Very Hard Task Grader — Streaming Pipeline Debug
+# ---------------------------------------------------------------------------
+
+def grade_veryhard(state: PipelineState) -> float:
+    """
+    Scoring components:
+      20%  stage order correct
+      30%  bugs_fixed ratio   (13 bugs)
+      20%  completeness ≥ 0.93
+      15%  validity     ≥ 0.92
+      10%  uniqueness   ≥ 0.97
+       5%  accuracy     ≥ 0.93
+      Penalty: -0.05 if SLA > 200ms
+    Score clipped to (0.001, 0.999).
+    """
+    correct_order = ["ingest","validate","transform","enrich","load"]
+    order_score   = 1.0 if state.stage_order == correct_order else 0.0
+
+    bugs      = state.bugs_fixed
+    bug_ratio = sum(1 for v in bugs.values() if v) / len(bugs) if bugs else 0.0
+
+    comp_score  = _metric_score(state.metrics.completeness, 0.93)
+    valid_score = _metric_score(state.metrics.validity,     0.92)
+    uniq_score  = _metric_score(state.metrics.uniqueness,   0.97)
+    acc_score   = _metric_score(state.metrics.accuracy,     0.93)
+    sla_penalty = -0.05 if state.metrics.sla_latency_ms > 200.0 else 0.0
+
+    raw = (0.20 * order_score + 0.30 * bug_ratio +
+           0.20 * comp_score  + 0.15 * valid_score +
+           0.10 * uniq_score  + 0.05 * acc_score +
+           sla_penalty)
+    return _clip(raw)
+
+
+# ---------------------------------------------------------------------------
+# Expert Task Grader — Multi-Source Join Repair
+# ---------------------------------------------------------------------------
+
+def grade_expert(state: PipelineState) -> float:
+    """
+    Scoring components:
+      15%  stage order correct
+      35%  bugs_fixed ratio   (17 bugs — most complex)
+      20%  completeness ≥ 0.94
+      15%  validity     ≥ 0.93
+      10%  uniqueness   ≥ 0.98
+       5%  accuracy     ≥ 0.94
+      Penalty: -0.07 if SLA > 150ms (tighter SLA than other tasks)
+    Score clipped to (0.001, 0.999).
+    """
+    correct_order = ["ingest","validate","transform","enrich","load"]
+    order_score   = 1.0 if state.stage_order == correct_order else 0.0
+
+    bugs      = state.bugs_fixed
+    bug_ratio = sum(1 for v in bugs.values() if v) / len(bugs) if bugs else 0.0
+
+    comp_score  = _metric_score(state.metrics.completeness, 0.94)
+    valid_score = _metric_score(state.metrics.validity,     0.93)
+    uniq_score  = _metric_score(state.metrics.uniqueness,   0.98)
+    acc_score   = _metric_score(state.metrics.accuracy,     0.94)
+    sla_penalty = -0.07 if state.metrics.sla_latency_ms > 150.0 else 0.0
+
+    raw = (0.15 * order_score + 0.35 * bug_ratio +
+           0.20 * comp_score  + 0.15 * valid_score +
+           0.10 * uniq_score  + 0.05 * acc_score +
+           sla_penalty)
+    return _clip(raw)
+
+
+# Register new graders
+GRADERS["task_veryhard_streaming_pipeline"] = grade_veryhard
+GRADERS["task_expert_multi_source_join"]    = grade_expert
