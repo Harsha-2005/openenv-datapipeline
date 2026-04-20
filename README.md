@@ -18,8 +18,6 @@ tags:
 
 > **A real-world OpenEnv environment where AI agents debug broken ETL pipelines across 5 difficulty levels.**
 
-[![Phase 1](https://img.shields.io/badge/Phase%201-PASSED-green)](https://huggingface.co/spaces/Harsha-2005/openenv-datapipeline)
-[![Phase 2](https://img.shields.io/badge/Phase%202-PASSED-green)](https://huggingface.co/spaces/Harsha-2005/openenv-datapipeline)
 [![OpenEnv](https://img.shields.io/badge/OpenEnv-compliant-blue)](https://openenv.dev)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Tasks](https://img.shields.io/badge/tasks-5-orange)](https://huggingface.co/spaces/Harsha-2005/openenv-datapipeline)
