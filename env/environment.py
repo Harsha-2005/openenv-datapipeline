@@ -11,6 +11,7 @@ StepRecord + env.history preserved for Replay Dashboard.
 
 from __future__ import annotations
 
+import random
 import time
 from dataclasses import dataclass, field
 from typing import Any, List, Optional, Tuple
@@ -42,6 +43,11 @@ class StepRecord:
     bugs_remaining:    int
     description:       str
     timestamp_ms:      float = field(default_factory=lambda: time.time() * 1000)
+    # ── Explainability fields ──
+    reasoning:          str            = ""      # Why the agent chose this action
+    observation_summary: str           = ""      # What the agent saw before acting
+    reward_components:  dict           = field(default_factory=dict)  # Breakdown: {"progress": 0.04, "penalty": -0.02, ...}
+    alternatives:       list           = field(default_factory=list)  # Other actions the agent considered
 
     def to_dict(self) -> dict:
         return {
@@ -53,7 +59,12 @@ class StepRecord:
             "bugs_remaining":    self.bugs_remaining,
             "description":       self.description,
             "timestamp_ms":      round(self.timestamp_ms, 1),
+            "reasoning":         self.reasoning,
+            "observation_summary": self.observation_summary,
+            "reward_components":  self.reward_components,
+            "alternatives":      self.alternatives,
         }
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -78,7 +89,24 @@ def _clip(v: float) -> float:
 
 
 def _df_to_data(df: pd.DataFrame) -> List[dict]:
-    return df.where(pd.notnull(df), None).to_dict(orient="records")
+    import numpy as np
+    # Prevent JSON serialization errors by replacing inf, NaN, and pd.NA with None
+    clean_df = df.replace([np.inf, -np.inf], None).where(pd.notnull(df), None)
+    records = clean_df.to_dict(orient="records")
+    # pd.NA from nullable Int64/Float64 types is NOT JSON serializable;
+    # convert any remaining pd.NA / numpy scalars to plain Python types
+    sanitized = []
+    for row in records:
+        clean_row = {}
+        for k, v in row.items():
+            if v is pd.NA or (v is not None and pd.isna(v)):
+                clean_row[k] = None
+            elif hasattr(v, 'item'):
+                clean_row[k] = v.item()
+            else:
+                clean_row[k] = v
+        sanitized.append(clean_row)
+    return sanitized
 
 
 def _recompute_metrics(data: List[dict], schema: List[SchemaField]) -> PipelineMetrics:
@@ -97,7 +125,6 @@ def _recompute_metrics(data: List[dict], schema: List[SchemaField]) -> PipelineM
             seen.add(key); unique += 1
     uniqueness = unique / total
 
-    import random
     return PipelineMetrics(
         completeness  = round(min(1.0, completeness), 4),
         uniqueness    = round(min(1.0, uniqueness),   4),
@@ -127,12 +154,12 @@ def _bug_count_df(df: pd.DataFrame, task_cfg: dict) -> int:
 def _describe(action: str, params: dict, result: _ActionResult) -> str:
     a = action
     if a == "inspect":            return f"Inspected state. {result.message}"
-    if a == "cast_column":        return f'Cast "{params.get("column","?")}" → {params.get("dtype","?")}.'
+    if a == "cast_column":        return f'Cast "{params.get("column","?")}" -> {params.get("dtype") or params.get("type") or params.get("value","?")}.'
     if a == "drop_nulls":         return f'Dropped null rows in "{params.get("column","all")}".'
     if a == "fill_nulls":         return f'Filled nulls in "{params.get("column","?")}" with {params.get("value","median")}.'
     if a == "drop_duplicates":    return f"Removed duplicates. {result.message}"
     if a == "filter_outliers":    return f'Filtered outliers in "{params.get("column","?")}". {result.message}'
-    if a == "rename_column":      return f'Renamed "{params.get("old_name","?")}" → "{params.get("new_name","?")}".'
+    if a == "rename_column":      return f'Renamed "{params.get("old_name","?")}" -> "{params.get("new_name","?")}".'
     if a == "reorder_stages":     return f'Stage order set to {params.get("order",[])}.'
     if a == "apply_business_rule":return f'Rule "{params.get("rule","?")}": {result.message}'
     if a == "validate":           return f"Validated. Score: {result.score:.4f}." if result.score else "Validated."
@@ -236,14 +263,31 @@ class DataPipelineEnv:
         # Dispatch
         result = self._dispatch(raw_action, params)
 
+        # ── Advanced Rewards ──
+        # Novelty bonus for taking a productive action sequence not recently used
+        novelty_bonus = 0.0
+        if result.reward > 0 and not repeat:
+            novelty_bonus = 0.02
+        
+        # Cascade bonus for chaining multiple successful fixes
+        cascade_bonus = 0.0
+        if getattr(self, '_last_reward', 0) > 0 and result.reward > 0:
+            cascade_bonus = 0.03
+        self._last_reward = result.reward
+
+        # Regression penalty if action caused an error or negative reward
+        regression_penalty = 0.0
+        if result.reward < 0:
+            regression_penalty = -0.01
+
         # Compute final reward
-        reward = result.reward + self.STEP_COST
+        reward = result.reward + self.STEP_COST + novelty_bonus + cascade_bonus + regression_penalty
         if repeat and raw_action not in ("validate", "submit"):
             reward += self.REPEAT_PENALTY
         self._cumulative_reward    += reward
         self.state.cumulative_reward = self._cumulative_reward
 
-        # Sync df → state.data and recompute metrics
+        # Sync df -> state.data and recompute metrics
         if self._df is not None:
             self.state.data    = _df_to_data(self._df)
             self.state.metrics = _recompute_metrics(self.state.data, self.state.schema_info)
@@ -260,8 +304,19 @@ class DataPipelineEnv:
         if result.error_lines:
             self.state.error_log.extend(result.error_lines)
 
-        # StepRecord
+        # StepRecord with explainability
         desc = _describe(raw_action, params, result)
+
+        # Auto-generate reasoning trace
+        reasoning = self._generate_reasoning(raw_action, params, result, reward, repeat, bugs)
+        obs_summary = self._generate_obs_summary()
+        reward_components = {
+            "action_reward": round(result.reward, 4),
+            "step_cost": self.STEP_COST,
+            "repeat_penalty": self.REPEAT_PENALTY if (repeat and raw_action not in ("validate", "submit")) else 0.0,
+            "total": round(reward, 4),
+        }
+
         self.history.append(StepRecord(
             step              = self._step_count,
             action            = raw_action,
@@ -270,6 +325,9 @@ class DataPipelineEnv:
             cumulative_reward = _clip(self._cumulative_reward),
             bugs_remaining    = bugs,
             description       = desc,
+            reasoning         = reasoning,
+            observation_summary = obs_summary,
+            reward_components = reward_components,
         ))
 
         return _make_observation(self.state, hint=result.message)
@@ -289,12 +347,23 @@ class DataPipelineEnv:
         # ── cast_column ──
         if action == ActionType.CAST_COLUMN.value:
             col   = params.get("column") or params.get("col")
-            dtype = params.get("dtype")  or params.get("type")
+            dtype = params.get("dtype") or params.get("type") or params.get("value")
             if not col or col not in df.columns:
                 return _ActionResult(reward=-0.01, message=f"Column '{col}' not found.")
             try:
-                self._df[col] = df[col].astype(dtype)
-                return _ActionResult(reward=0.06, message=f"Cast '{col}'→{dtype}.")
+                if dtype in ["int", "float", "int64", "float64"]:
+                    num = pd.to_numeric(df[col], errors="coerce")
+                    if dtype.startswith("int"):
+                        self._df[col] = num.astype("Int64")
+                    else:
+                        self._df[col] = num.astype("float64")
+                else:
+                    self._df[col] = df[col].astype(dtype)
+                    
+                for sf in self.state.schema_info:
+                    if sf.name == col:
+                        sf.actual_type = dtype
+                return _ActionResult(reward=0.06, message=f"Cast '{col}'->{dtype}.")
             except Exception as e:
                 return _ActionResult(reward=-0.01, message=str(e))
 
@@ -317,6 +386,18 @@ class DataPipelineEnv:
                 return _ActionResult(reward=-0.01, message=f"Column '{col}' not found.")
             num = pd.to_numeric(df[col], errors="coerce")
             fill_val = num.median() if value == "median" else value
+            # Handle median returning NaN when all values are null
+            if fill_val is None or (isinstance(fill_val, float) and pd.isna(fill_val)):
+                fill_val = 0
+            # Coerce fill_val to match the column dtype to avoid TypeError with Int64/Float64
+            col_dtype = str(df[col].dtype)
+            try:
+                if col_dtype in ("Int64", "int64", "int32", "int"):
+                    fill_val = int(float(fill_val))
+                elif col_dtype in ("Float64", "float64", "float32", "float"):
+                    fill_val = float(fill_val)
+            except (ValueError, TypeError):
+                fill_val = 0
             self._df[col] = df[col].fillna(fill_val)
             return _ActionResult(reward=0.08, message=f"Filled nulls in '{col}' with {fill_val}.")
 
@@ -354,11 +435,14 @@ class DataPipelineEnv:
             if not old or old not in df.columns:
                 return _ActionResult(reward=-0.01, message=f"Column '{old}' not found.")
             self._df = df.rename(columns={old: new})
-            return _ActionResult(reward=0.06, message=f"Renamed '{old}'→'{new}'.")
+            for sf in self.state.schema_info:
+                if sf.name == old:
+                    sf.name = new
+            return _ActionResult(reward=0.06, message=f"Renamed '{old}'->'{new}'.")
 
         # ── reorder_stages ──
         if action == ActionType.REORDER_STAGES.value:
-            order = params.get("order", [])
+            order = params.get("order") or params.get("stages", [])
             self.state.stage_order = order
             correct = ["ingest","validate","transform","enrich","load"]
             reward  = 0.12 if order == correct else 0.02
@@ -366,7 +450,7 @@ class DataPipelineEnv:
 
         # ── apply_business_rule ──
         if action == ActionType.APPLY_BUSINESS_RULE.value:
-            rule = params.get("rule", "")
+            rule = params.get("rule") or params.get("value", "")
             return self._apply_rule(rule)
 
         # ── validate ──
@@ -377,9 +461,15 @@ class DataPipelineEnv:
         # ── submit ──
         if action == ActionType.SUBMIT.value:
             score = _clip(self._score_current())
+            
+            # Efficiency Bonus
+            efficiency_bonus = 0.0
+            if score >= 0.8 and self._step_count < self.state.max_steps:
+                efficiency_bonus = 0.05 * (1.0 - (self._step_count / self.state.max_steps))
+                
             return _ActionResult(
-                reward  = self.SUBMIT_BONUS * score,
-                message = f"Final score: {score:.4f}",
+                reward  = (self.SUBMIT_BONUS * score) + efficiency_bonus,
+                message = f"Final score: {score:.4f} (Efficiency Bonus: +{efficiency_bonus:.3f})" if efficiency_bonus > 0 else f"Final score: {score:.4f}",
                 score   = score,
                 done    = True,
             )
@@ -433,3 +523,78 @@ class DataPipelineEnv:
             return TASK_REGISTRY[self.task_id].config
         except Exception:
             return {}
+
+    # ── explainability ────────────────────────────────────────────────────────
+
+    def _generate_reasoning(self, action: str, params: dict,
+                            result: _ActionResult, reward: float,
+                            repeat: bool, bugs: int) -> str:
+        """Auto-generate a human-readable reasoning trace for this step."""
+        parts = []
+
+        if action == "inspect":
+            parts.append("Agent inspected the pipeline state to gather information about current data quality issues.")
+        elif action == "cast_column":
+            col = params.get("column", "?")
+            dtype = params.get("dtype") or params.get("type") or params.get("value", "?")
+            parts.append(f'Schema mismatch detected on column "{col}". Casting to {dtype} to fix type alignment.')
+        elif action == "drop_duplicates":
+            parts.append("Duplicate rows detected in the dataset. Removing them to improve uniqueness score.")
+        elif action == "drop_nulls":
+            col = params.get("column", "all columns")
+            parts.append(f'Null values in "{col}" are reducing completeness. Dropping null rows to improve data quality.')
+        elif action == "fill_nulls":
+            col = params.get("column", "?")
+            val = params.get("value", "default")
+            parts.append(f'Filling nulls in "{col}" with "{val}" to maintain row count while improving completeness.')
+        elif action == "filter_outliers":
+            col = params.get("column", "?")
+            parts.append(f'Outlier values in "{col}" are skewing metrics. Filtering to valid range.')
+        elif action == "reorder_stages":
+            parts.append("Pipeline stages were in wrong order. Correcting to: ingest -> validate -> transform -> enrich -> load.")
+        elif action == "apply_business_rule":
+            rule = params.get("rule") or params.get("value", "?")
+            parts.append(f'Applying business rule "{rule}" to enforce domain constraints.')
+        elif action == "validate":
+            parts.append("Running validation to check current pipeline health before proceeding.")
+        elif action == "submit":
+            parts.append("All fixes applied. Submitting for final grading.")
+
+        if reward > 0.05:
+            parts.append(f"✅ Positive impact: +{reward:.3f} reward.")
+        elif reward < -0.03:
+            parts.append(f"⚠️ Negative impact: {reward:.3f} reward.")
+
+        if repeat and action not in ("validate", "submit"):
+            parts.append("⚡ Repeat action detected — penalty applied.")
+
+        if bugs == 0:
+            parts.append("🎯 All bugs resolved!")
+        elif bugs <= 3:
+            parts.append(f"🔧 {bugs} bug(s) remaining — close to completion.")
+
+        return " ".join(parts)
+
+    def _generate_obs_summary(self) -> str:
+        """Summarize what the agent can currently observe."""
+        if self.state is None or self._df is None:
+            return "No state available."
+
+        df = self._df
+        metrics = self.state.metrics
+        errors = self.state.error_log[-3:] if self.state.error_log else []
+
+        parts = [
+            f"Rows: {len(df)}, Cols: {len(df.columns)}",
+            f"Nulls: {int(df.isnull().sum().sum())}",
+            f"Dups: {int(df.duplicated().sum())}",
+        ]
+        if metrics:
+            m = metrics if isinstance(metrics, dict) else metrics.model_dump() if hasattr(metrics, "model_dump") else {}
+            if isinstance(m, dict):
+                parts.append(f"Completeness: {m.get('completeness', '?')}")
+                parts.append(f"Uniqueness: {m.get('uniqueness', '?')}")
+        if errors:
+            parts.append(f"Recent errors: {'; '.join(errors[-2:])}")
+
+        return " | ".join(parts)

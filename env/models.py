@@ -6,7 +6,7 @@ All Observation, Action, Reward, and State models following OpenEnv spec.
 from __future__ import annotations
 from typing import Any, Dict, List, Optional
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 # ---------------------------------------------------------------------------
@@ -55,8 +55,7 @@ class Action(BaseModel):
         None, description="Extra parameters for complex actions"
     )
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 # ---------------------------------------------------------------------------

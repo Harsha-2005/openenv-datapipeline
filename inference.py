@@ -27,6 +27,8 @@ TASKS = [
     "task_easy_schema_fix",
     "task_medium_data_quality",
     "task_hard_pipeline_orchestration",
+    "task_veryhard_streaming_pipeline",
+    "task_expert_multi_source_join",
 ]
 SEED = 42
 
@@ -140,7 +142,8 @@ def _rule_based_fallback(obs: Dict, inspect_count: int, last_actions: List[str])
     errors_str  = " ".join(error_log).lower()
     hint        = obs.get("hint", "")
 
-    if task_id == "task_hard_pipeline_orchestration":
+    # Handle stage reordering for Hard, VeryHard, and Expert tasks
+    if task_id in ("task_hard_pipeline_orchestration", "task_veryhard_streaming_pipeline", "task_expert_multi_source_join"):
         already_reordered = "reorder_stages" in last_actions
         if not already_reordered and ("stage order" in errors_str or "wrong" in errors_str or "reorder" in hint.lower()):
             return {"action_type": "reorder_stages",
@@ -166,14 +169,16 @@ def _rule_based_fallback(obs: Dict, inspect_count: int, last_actions: List[str])
         return {"action_type": "drop_duplicates"}
 
     if "negative" in errors_str or "outlier" in errors_str:
-        for col, mn, mx in [("quantity","0","9999"),("unit_price","0","99999"),("amount","0","999999")]:
+        for col, mn, mx in [("quantity","0","9999"),("unit_price","0","99999"),("amount","0","999999"),("value","0","99999"),("latency_ms","0","30000")]:
             if col in errors_str and f"filter:{col}" not in last_actions:
                 return {"action_type": "filter_outliers", "column": col, "value": f"{mn},{mx}"}
 
     NULL_FILLS = {
-        "task_easy_schema_fix":            [("age","0"),("revenue","0.0"),("email","unknown@example.com")],
-        "task_medium_data_quality":         [("quantity","1"),("unit_price","0.0"),("region","UNKNOWN"),("order_date","2024-01-01")],
-        "task_hard_pipeline_orchestration": [("merchant","UNKNOWN"),("fraud_score","0.0"),("category","UNKNOWN"),("country_code","US"),("currency","USD")],
+        "task_easy_schema_fix":              [("age","0"),("revenue","0.0"),("email","unknown@example.com")],
+        "task_medium_data_quality":           [("quantity","1"),("unit_price","0.0"),("region","UNKNOWN"),("order_date","2024-01-01")],
+        "task_hard_pipeline_orchestration":   [("merchant","UNKNOWN"),("fraud_score","0.0"),("category","UNKNOWN"),("country_code","US"),("currency","USD")],
+        "task_veryhard_streaming_pipeline":   [("event_type","UNKNOWN"),("session_id","unknown"),("region","UNKNOWN"),("value","0.0"),("latency_ms","0")],
+        "task_expert_multi_source_join":      [("customer_name","UNKNOWN"),("product_name","UNKNOWN"),("category","UNKNOWN"),("email","unknown@example.com")],
     }
     if "null" in errors_str:
         for col, val in NULL_FILLS.get(task_id, []):
@@ -355,6 +360,110 @@ def _grade_from_obs(obs: Dict) -> float:
            m.get("validity",0)     + m.get("accuracy",0)) / 4
     # Clip to strictly open interval (0, 1) — 0.0 and 1.0 not allowed
     return round(min(0.999, max(0.001, raw)), 4)
+
+# ---------------------------------------------------------------------------
+# run_agent_episode — local episode runner used by train.py
+# ---------------------------------------------------------------------------
+def run_agent_episode(
+    env,
+    task_id: str,
+    noise: float = 0.0,
+    episode: int = 0,
+    base_url: str = "",
+    model_name: str = "",
+    hf_token: str = "",
+) -> tuple:
+    """
+    Run one episode using a local DataPipelineEnv instance.
+    Used by train.py for curriculum training.
+
+    Parameters
+    ----------
+    env : DataPipelineEnv  — already reset()'d environment
+    task_id : str          — current task identifier
+    noise : float          — exploration noise (0=greedy, 1=random)
+    episode : int          — episode number for logging
+    base_url, model_name, hf_token — LLM config (unused in fallback mode)
+
+    Returns
+    -------
+    (score: float, steps: int)
+    """
+    import random as _rng
+    from env.models import Action, ActionType
+
+    obs_obj = env.reset()
+    obs = obs_obj.model_dump() if hasattr(obs_obj, "model_dump") else obs_obj
+    done = obs.get("done", False)
+    max_steps = obs.get("max_steps", 40)
+    step_count = 0
+    inspect_count = 0
+    last_actions: List[str] = []
+    score = 0.0
+
+    while not done and step_count < max_steps:
+        # With probability `noise`, pick a random action; otherwise use rule-based
+        if _rng.random() < noise:
+            action_dict = _rng.choice([
+                {"action_type": "inspect"},
+                {"action_type": "drop_duplicates"},
+                {"action_type": "validate"},
+            ])
+        else:
+            action_dict = _rule_based_fallback(obs, inspect_count, last_actions)
+
+        at = action_dict.get("action_type", "inspect")
+        col = action_dict.get("column")
+        val = action_dict.get("value")
+        params = action_dict.get("parameters")
+
+        if at == "inspect":
+            inspect_count += 1
+
+        # Track actions for repeat detection
+        if at == "cast_column" and col:         last_actions.append(f"cast:{col}")
+        elif at == "fill_nulls" and col:        last_actions.append(f"fill:{col}")
+        elif at == "filter_outliers" and col:   last_actions.append(f"filter:{col}")
+        elif at == "apply_business_rule" and val: last_actions.append(f"rule:{val[:10]}")
+        else:                                    last_actions.append(at)
+
+        # Build Action object for local env
+        try:
+            action = Action(
+                action_type=ActionType(at),
+                column=col,
+                value=val,
+                parameters=params,
+            )
+            obs_obj = env.step(action)
+            obs = obs_obj.model_dump() if hasattr(obs_obj, "model_dump") else obs_obj
+            done = obs.get("done", False)
+            step_count += 1
+        except Exception as e:
+            print(f"  [ep {episode}] step error: {e}", file=sys.stderr)
+            step_count += 1
+            continue
+
+        # Force submit near step limit
+        if max_steps - step_count <= 1 and not done:
+            try:
+                submit_action = Action(action_type=ActionType.SUBMIT)
+                obs_obj = env.step(submit_action)
+                obs = obs_obj.model_dump() if hasattr(obs_obj, "model_dump") else obs_obj
+                done = True
+                step_count += 1
+            except Exception:
+                done = True
+
+    # Extract final score from the last history entry
+    if env.history:
+        last_rec = env.history[-1]
+        score = last_rec.cumulative_reward if hasattr(last_rec, "cumulative_reward") else 0.0
+    else:
+        score = _grade_from_obs(obs)
+
+    return score, step_count
+
 
 # ---------------------------------------------------------------------------
 # Entry point

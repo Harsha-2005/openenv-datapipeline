@@ -145,7 +145,7 @@ tasks.forEach((t, i) => {{
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(html)
-    print(f"[visualize] Reward chart → {os.path.abspath(output_path)}")
+    print(f"[visualize] Reward chart -> {os.path.abspath(output_path)}")
     return os.path.abspath(output_path)
 
 
@@ -250,6 +250,8 @@ def generate_replay_html(
   .step-num{{ font-size:22px; font-weight:500; }}
   .detail-row{{ display:flex; gap:20px; font-size:12px; margin-top:10px; }}
   .detail-row span:first-child{{ color:#888780; display:block; margin-bottom:2px; font-size:11px; }}
+  .explain-box{{ background:#f1efe8; border-radius:8px; padding:10px; margin-top:10px; font-size:12px; color:#5f5e5a; }}
+  .explain-title{{ color:#2c2c2a; font-weight:600; display:block; margin-bottom:4px; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; }}
 
   /* Action log */
   .log-row{{ display:flex; align-items:center; gap:10px; padding:7px 0;
@@ -286,6 +288,8 @@ def generate_replay_html(
     body{{ background:#1e1e1c; color:#d3d1c7; }}
     .stat{{ background:#2c2c2a; }}
     .stat-label,.log-step,.kb-hint{{ color:#888780; }}
+    .explain-box{{ background:#2c2c2a; color:#b4b2a9; }}
+    .explain-title{{ color:#d3d1c7; }}
     .card{{ background:#252523; border-color:#444441; }}
     .card-title{{ color:#888780; }}
     .log-row{{ border-color:#444441; }}
@@ -345,6 +349,16 @@ def generate_replay_html(
       <span class="chip" id="d-chip">inspect</span>
     </div>
     <p style="font-size:13px;color:#5f5e5a;margin-bottom:10px;line-height:1.5" id="d-desc">—</p>
+    
+    <div class="explain-box">
+      <span class="explain-title">Reasoning</span>
+      <span id="d-reasoning">—</span>
+    </div>
+    
+    <div class="explain-box">
+      <span class="explain-title">Observation Summary</span>
+      <span id="d-obssummary">—</span>
+    </div>
     <div class="detail-row">
       <div><span>Reward</span><span style="font-size:16px;font-weight:500" id="d-reward">—</span></div>
       <div><span>Cumulative</span><span style="font-size:16px;font-weight:500" id="d-cum">—</span></div>
@@ -433,6 +447,8 @@ function updateDetail() {{
   chip.textContent = s.action;
   chip.className = 'chip ' + chipClass(s.action);
   document.getElementById('d-desc').textContent = s.description;
+  document.getElementById('d-reasoning').textContent = s.reasoning || "No reasoning provided.";
+  document.getElementById('d-obssummary').textContent = s.observation_summary || "No observation summary.";
   const r = s.reward;
   document.getElementById('d-reward').textContent = (r >= 0 ? '+' : '') + r.toFixed(3);
   document.getElementById('d-reward').style.color = r >= 0 ? '#1D9E75' : '#D85A30';
@@ -527,5 +543,5 @@ seek(0);
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(html)
-    print(f"[visualize] Replay dashboard → {os.path.abspath(output_path)}")
+    print(f"[visualize] Replay dashboard -> {os.path.abspath(output_path)}")
     return os.path.abspath(output_path)

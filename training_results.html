@@ -1,249 +1,95 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<title>Training Results — OpenEnv Data Pipeline Debugger</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenEnv — Training Reward Curves</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #eee; padding: 24px; }
-  h1   { color: #4fc3f7; font-size: 1.6em; margin-bottom: 4px; }
-  .sub { color: #888; font-size: 0.9em; margin-bottom: 24px; }
-  .badge { display:inline-block; padding:3px 12px; border-radius:20px; font-size:0.8em; margin:3px;
-            font-weight:600; }
-  .b1 { background:#0d47a188; color:#90caf9; border:1px solid #4fc3f7; }
-  .b2 { background:#1b5e2088; color:#a5d6a7; border:1px solid #81c784; }
-  .b3 { background:#e65100aa; color:#ffcc80; border:1px solid #ffb74d; }
-  .b4 { background:#4a148c88; color:#ce93d8; border:1px solid #ce93d8; }
-  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin:24px 0; }
-  .card  { background:#1e2130; border-radius:12px; padding:18px; text-align:center; }
-  .card.c1 { border-left:4px solid #4fc3f7; }
-  .card.c2 { border-left:4px solid #81c784; }
-  .card.c3 { border-left:4px solid #ffb74d; }
-  .card.c4 { border-left:4px solid #ce93d8; }
-  .val  { font-size:2.2em; font-weight:700; }
-  .v1   { color:#4fc3f7; }
-  .v2   { color:#81c784; }
-  .v3   { color:#ffb74d; }
-  .v4   { color:#ce93d8; }
-  .lbl  { font-size:0.75em; color:#888; margin-top:6px; }
-  .chart-wrap { background:#1e2130; border-radius:14px; padding:22px; margin:20px 0;
-                 box-shadow:0 4px 20px rgba(0,0,0,0.4); }
-  .chart-title { font-size:1em; color:#ccc; margin-bottom:14px; font-weight:600; }
-  .phases { display:flex; gap:16px; margin:20px 0; flex-wrap:wrap; }
-  .phase-card { flex:1; min-width:200px; background:#1e2130; border-radius:10px; padding:14px; }
-  .phase-card h3 { font-size:0.85em; margin-bottom:8px; }
-  .phase-row { display:flex; justify-content:space-between; font-size:0.8em; color:#888; padding:3px 0; }
-  .phase-val { color:#eee; font-weight:600; }
-  .insight { background:#1e2130; border-radius:10px; padding:16px; margin-top:20px;
-               border-left:4px solid #4fc3f7; }
-  .insight h3 { color:#4fc3f7; margin-bottom:8px; font-size:0.95em; }
-  .insight li { font-size:0.85em; color:#aaa; margin:6px 0 6px 16px; line-height:1.5; }
-  .insight li span { color:#eee; font-weight:600; }
-  canvas { max-height:280px; }
+  body { font-family: system-ui, sans-serif; background: #f8f8f5; color: #2c2c2a; padding: 2rem; }
+  h1 { font-size: 1.3rem; font-weight: 500; margin-bottom: 0.25rem; }
+  .sub { font-size: 0.85rem; color: #888780; margin-bottom: 1.5rem; }
+  .card { background: #fff; border: 0.5px solid #d3d1c7; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 1.25rem; }
+  .stat { background: #f1efe8; border-radius: 8px; padding: 0.75rem 1rem; }
+  .stat-label { font-size: 11px; color: #888780; margin-bottom: 3px; }
+  .stat-val { font-size: 1.35rem; font-weight: 500; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 1rem; font-size: 12px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
 </style>
 </head>
 <body>
-
-<h1>📈 Training Results — OpenEnv Data Pipeline Debugger</h1>
-<p class="sub">Curriculum Learning: Easy → Medium → Hard | 1000 steps | 102 episodes | seed=42</p>
-
-<div>
-  <span class="badge b1">🎯 Phase 1: Easy Schema Fix</span>
-  <span class="badge b2">📊 Phase 2: Data Quality</span>
-  <span class="badge b3">⚙️ Phase 3: Pipeline Orchestration</span>
-  <span class="badge b4">✅ All phases complete</span>
-</div>
+<h1>OpenEnv — Training Reward Curves</h1>
+<p class="sub">Curriculum training across 1000 episodes · 1 task tiers</p>
 
 <div class="stats">
-  <div class="card c1">
-    <div class="val v1">0.9808</div>
-    <div class="lbl">Best Score Achieved</div>
-  </div>
-  <div class="card c2">
-    <div class="val v2">0.9663</div>
-    <div class="lbl">Final Avg Score (last 10)</div>
-  </div>
-  <div class="card c3">
-    <div class="val v3">+0.36</div>
-    <div class="lbl">Score Improvement (0.62→0.98)</div>
-  </div>
-  <div class="card c4">
-    <div class="val v4">102</div>
-    <div class="lbl">Total Episodes Trained</div>
-  </div>
+  <div class="stat"><div class="stat-label">Best score</div><div class="stat-val">0.1200</div></div>
+  <div class="stat"><div class="stat-label">Final score</div><div class="stat-val">0.0700</div></div>
+  <div class="stat"><div class="stat-label">Total episodes</div><div class="stat-val">1000</div></div>
+  <div class="stat"><div class="stat-label">Improvement</div><div class="stat-val">+0.069</div></div>
 </div>
 
-<div class="chart-wrap">
-  <div class="chart-title">📈 Score Improvement Across All 3 Curriculum Phases</div>
-  <canvas id="scoreChart"></canvas>
+<div class="card">
+  <canvas id="rewardChart" height="90"></canvas>
+  <div class="legend" id="legend"></div>
 </div>
-
-<div class="chart-wrap">
-  <div class="chart-title">💰 Episode Reward (shows learning signal strength per task)</div>
-  <canvas id="rewardChart"></canvas>
-</div>
-
-<div class="phases">
-  <div class="phase-card" style="border-top:3px solid #4fc3f7">
-    <h3 style="color:#4fc3f7">Phase 1 — Easy (Episodes 1–33)</h3>
-    <div class="phase-row">Start score <span class="phase-val">0.820</span></div>
-    <div class="phase-row">End score   <span class="phase-val">0.900</span></div>
-    <div class="phase-row">Best score  <span class="phase-val">0.900</span></div>
-    <div class="phase-row">Avg reward  <span class="phase-val">+0.255</span></div>
-    <div class="phase-row">Status      <span class="phase-val" style="color:#81c784">Mastered ✓</span></div>
-  </div>
-  <div class="phase-card" style="border-top:3px solid #81c784">
-    <h3 style="color:#81c784">Phase 2 — Medium (Episodes 34–67)</h3>
-    <div class="phase-row">Start score <span class="phase-val">0.850</span></div>
-    <div class="phase-row">End score   <span class="phase-val">0.950</span></div>
-    <div class="phase-row">Best score  <span class="phase-val">0.950</span></div>
-    <div class="phase-row">Avg reward  <span class="phase-val">+0.035</span></div>
-    <div class="phase-row">Status      <span class="phase-val" style="color:#81c784">Mastered ✓</span></div>
-  </div>
-  <div class="phase-card" style="border-top:3px solid #ffb74d">
-    <h3 style="color:#ffb74d">Phase 3 — Hard (Episodes 68–102)</h3>
-    <div class="phase-row">Start score <span class="phase-val">0.629</span></div>
-    <div class="phase-row">End score   <span class="phase-val">0.981</span></div>
-    <div class="phase-row">Best score  <span class="phase-val">0.981</span></div>
-    <div class="phase-row">Avg reward  <span class="phase-val">+0.128</span></div>
-    <div class="phase-row">Status      <span class="phase-val" style="color:#81c784">Converging ✓</span></div>
-  </div>
-</div>
-
-<div class="insight">
-  <h3>🔍 Key Training Insights</h3>
-  <ul>
-    <li><span>Clear improvement signal:</span> Score rises from 0.82 → 0.98 across curriculum phases — visible upward trend</li>
-    <li><span>Phase transitions visible:</span> Score dips at episode ~69 when agent moves to Hard task (more complex bugs), then recovers strongly</li>
-    <li><span>Noise decay works:</span> Noise 0.52 → 0.05 over training — agent becomes more precise over time</li>
-    <li><span>Hard task shows most growth:</span> 0.629 → 0.981 within 34 episodes — fastest learning phase</li>
-    <li><span>Curriculum effectiveness:</span> All 3 phases mastered in 102 episodes vs 300+ without curriculum</li>
-  </ul>
-</div>
-
-<p style="color:#333; font-size:0.75em; margin-top:30px; text-align:center;">
-  OpenEnv Data Pipeline Debugger | Meta PyTorch Hackathon × Scaler School of Technology |
-  Team: Maddala Hema Narasimha Harsha Pavan
-</p>
 
 <script>
-const labels = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "80", "81", "82", "83", "84", "85", "86", "87", "88", "89", "90", "91", "92", "93", "94", "95", "96", "97", "98", "99", "100", "101", "102"];
-const rawScores  = [0.82, 0.82, 0.9, 0.82, 0.9, 0.82, 0.82, 0.82, 0.9, 0.74, 0.82, 0.9, 0.82, 0.82, 0.9, 0.82, 0.82, 0.9, 0.9, 0.82, 0.82, 0.9, 0.9, 0.82, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.82, 0.9, 0.85, 0.8416, 0.8459, 0.8416, 0.9, 0.8911, 0.85, 0.85, 0.9, 0.85, 0.95, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.85, 0.95, 0.9, 0.9, 0.95, 0.95, 0.9, 0.9, 0.8499, 0.9, 0.9, 0.8991, 0.95, 0.9, 0.9, 0.9, 0.95, 0.6288, 0.1038, 0.6538, 0.9358, 0.3923, 0.9423, 0.8701, 0.9423, 0.9808, 0.9615, 0.4115, 0.9808, 0.4115, 0.4115, 0.9808, 0.9423, 0.8615, 0.9808, 0.3923, 0.9808, 0.9615, 0.9615, 0.9808, 0.9615, 0.9808, 0.955, 0.9808, 0.9808, 0.9808, 0.9808, 0.9808, 0.8615, 0.9808, 0.9808];
-const smoothScores = [0.82, 0.82, 0.8467, 0.84, 0.852, 0.852, 0.852, 0.836, 0.852, 0.82, 0.82, 0.836, 0.836, 0.82, 0.852, 0.852, 0.836, 0.852, 0.868, 0.852, 0.852, 0.868, 0.868, 0.852, 0.868, 0.884, 0.884, 0.884, 0.9, 0.9, 0.9, 0.9, 0.884, 0.884, 0.874, 0.8623, 0.8515, 0.8558, 0.8558, 0.864, 0.8657, 0.8665, 0.8782, 0.8682, 0.88, 0.89, 0.9, 0.9, 0.91, 0.9, 0.9, 0.89, 0.9, 0.9, 0.9, 0.91, 0.93, 0.92, 0.92, 0.91, 0.9, 0.89, 0.8898, 0.8998, 0.9098, 0.9098, 0.9098, 0.92, 0.8558, 0.6965, 0.6473, 0.6544, 0.5429, 0.6056, 0.7589, 0.8166, 0.8256, 0.9394, 0.8332, 0.8554, 0.7492, 0.6354, 0.6392, 0.7454, 0.7215, 0.8354, 0.8315, 0.8315, 0.8354, 0.8554, 0.8554, 0.9692, 0.9692, 0.9679, 0.9718, 0.9718, 0.9756, 0.9756, 0.9808, 0.9569, 0.9569, 0.9569];
-const rawRewards = [0.12, 0.12, 0.31, 0.202, 0.24, 0.242, 0.202, 0.262, 0.24, 0.174, 0.212, 0.29, 0.222, 0.262, 0.31, 0.262, 0.242, 0.31, 0.31, 0.192, 0.242, 0.28, 0.279, 0.282, 0.31, 0.28, 0.299, 0.299, 0.299, 0.299, 0.299, 0.299, 0.232, 0.299, -0.142, 0.0029, -0.0265, 0.0029, 0.0271, 0.0402, -0.065, 0.005, 0.0, 0.045, 0.045, 0.053, 0.06, 0.0671, 0.03, 0.07, 0.08, 0.0421, 0.1021, 0.0271, 0.01, 0.048, 0.045, 0.003, 0.003, -0.0021, 0.05, 0.0271, 0.0261, 0.048, 0.033, 0.02, 0.06, 0.045, -0.2028, -0.7318, -0.0668, 0.2249, -0.3845, 0.192, 0.1197, 0.172, 0.1815, 0.1488, -0.3834, 0.2529, -0.4134, -0.4534, 0.1529, 0.292, 0.0932, 0.1729, -0.363, 0.2029, 0.2332, 0.3317, 0.1829, 0.2632, 0.2344, 0.256, 0.2029, 0.2015, 0.2029, 0.2044, 0.2044, 0.2032, 0.1844, 0.2144];
-const smoothRewards = [0.12, 0.12, 0.1833, 0.188, 0.1984, 0.2228, 0.2392, 0.2296, 0.2372, 0.224, 0.218, 0.2356, 0.2276, 0.232, 0.2592, 0.2692, 0.2596, 0.2772, 0.2868, 0.2632, 0.2592, 0.2668, 0.2606, 0.255, 0.2786, 0.2862, 0.29, 0.294, 0.2974, 0.2952, 0.299, 0.299, 0.2856, 0.2856, 0.1974, 0.1382, 0.0731, 0.0273, -0.0271, 0.0093, -0.0043, 0.002, 0.0015, 0.005, 0.006, 0.0296, 0.0406, 0.054, 0.051, 0.056, 0.0614, 0.0578, 0.0648, 0.0643, 0.0523, 0.0459, 0.0464, 0.0266, 0.0218, 0.0194, 0.0198, 0.0162, 0.0208, 0.0298, 0.0368, 0.0308, 0.0374, 0.0412, -0.009, -0.1619, -0.1793, -0.1463, -0.2322, -0.1532, 0.0171, 0.0648, 0.0561, 0.1628, 0.0477, 0.0744, -0.0427, -0.1697, -0.1689, -0.0338, -0.0657, 0.0515, 0.0696, 0.0796, 0.0678, 0.1155, 0.1175, 0.2428, 0.2491, 0.2536, 0.2279, 0.2316, 0.2195, 0.2135, 0.2032, 0.2033, 0.1999, 0.2022];
+const episodes    = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 295, 296, 297, 298, 299, 300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348, 349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 362, 363, 364, 365, 366, 367, 368, 369, 370, 371, 372, 373, 374, 375, 376, 377, 378, 379, 380, 381, 382, 383, 384, 385, 386, 387, 388, 389, 390, 391, 392, 393, 394, 395, 396, 397, 398, 399, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425, 426, 427, 428, 429, 430, 431, 432, 433, 434, 435, 436, 437, 438, 439, 440, 441, 442, 443, 444, 445, 446, 447, 448, 449, 450, 451, 452, 453, 454, 455, 456, 457, 458, 459, 460, 461, 462, 463, 464, 465, 466, 467, 468, 469, 470, 471, 472, 473, 474, 475, 476, 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488, 489, 490, 491, 492, 493, 494, 495, 496, 497, 498, 499, 500, 501, 502, 503, 504, 505, 506, 507, 508, 509, 510, 511, 512, 513, 514, 515, 516, 517, 518, 519, 520, 521, 522, 523, 524, 525, 526, 527, 528, 529, 530, 531, 532, 533, 534, 535, 536, 537, 538, 539, 540, 541, 542, 543, 544, 545, 546, 547, 548, 549, 550, 551, 552, 553, 554, 555, 556, 557, 558, 559, 560, 561, 562, 563, 564, 565, 566, 567, 568, 569, 570, 571, 572, 573, 574, 575, 576, 577, 578, 579, 580, 581, 582, 583, 584, 585, 586, 587, 588, 589, 590, 591, 592, 593, 594, 595, 596, 597, 598, 599, 600, 601, 602, 603, 604, 605, 606, 607, 608, 609, 610, 611, 612, 613, 614, 615, 616, 617, 618, 619, 620, 621, 622, 623, 624, 625, 626, 627, 628, 629, 630, 631, 632, 633, 634, 635, 636, 637, 638, 639, 640, 641, 642, 643, 644, 645, 646, 647, 648, 649, 650, 651, 652, 653, 654, 655, 656, 657, 658, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 675, 676, 677, 678, 679, 680, 681, 682, 683, 684, 685, 686, 687, 688, 689, 690, 691, 692, 693, 694, 695, 696, 697, 698, 699, 700, 701, 702, 703, 704, 705, 706, 707, 708, 709, 710, 711, 712, 713, 714, 715, 716, 717, 718, 719, 720, 721, 722, 723, 724, 725, 726, 727, 728, 729, 730, 731, 732, 733, 734, 735, 736, 737, 738, 739, 740, 741, 742, 743, 744, 745, 746, 747, 748, 749, 750, 751, 752, 753, 754, 755, 756, 757, 758, 759, 760, 761, 762, 763, 764, 765, 766, 767, 768, 769, 770, 771, 772, 773, 774, 775, 776, 777, 778, 779, 780, 781, 782, 783, 784, 785, 786, 787, 788, 789, 790, 791, 792, 793, 794, 795, 796, 797, 798, 799, 800, 801, 802, 803, 804, 805, 806, 807, 808, 809, 810, 811, 812, 813, 814, 815, 816, 817, 818, 819, 820, 821, 822, 823, 824, 825, 826, 827, 828, 829, 830, 831, 832, 833, 834, 835, 836, 837, 838, 839, 840, 841, 842, 843, 844, 845, 846, 847, 848, 849, 850, 851, 852, 853, 854, 855, 856, 857, 858, 859, 860, 861, 862, 863, 864, 865, 866, 867, 868, 869, 870, 871, 872, 873, 874, 875, 876, 877, 878, 879, 880, 881, 882, 883, 884, 885, 886, 887, 888, 889, 890, 891, 892, 893, 894, 895, 896, 897, 898, 899, 900, 901, 902, 903, 904, 905, 906, 907, 908, 909, 910, 911, 912, 913, 914, 915, 916, 917, 918, 919, 920, 921, 922, 923, 924, 925, 926, 927, 928, 929, 930, 931, 932, 933, 934, 935, 936, 937, 938, 939, 940, 941, 942, 943, 944, 945, 946, 947, 948, 949, 950, 951, 952, 953, 954, 955, 956, 957, 958, 959, 960, 961, 962, 963, 964, 965, 966, 967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981, 982, 983, 984, 985, 986, 987, 988, 989, 990, 991, 992, 993, 994, 995, 996, 997, 998, 999];
+const scores      = [0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.06, 0.001, 0.001, 0.001, 0.04, 0.001, 0.02, 0.001, 0.001, 0.04, 0.001, 0.001, 0.001, 0.001, 0.04, 0.001, 0.001, 0.05, 0.001, 0.001, 0.001, 0.02, 0.09, 0.001, 0.09, 0.03, 0.02, 0.12, 0.04, 0.09, 0.11, 0.001, 0.04, 0.09, 0.09, 0.01, 0.001, 0.09, 0.07, 0.02, 0.11, 0.001, 0.09, 0.001, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.06, 0.07, 0.04, 0.09, 0.09, 0.12, 0.09, 0.12, 0.07, 0.09, 0.12, 0.09, 0.09, 0.09, 0.05, 0.09, 0.09, 0.04, 0.09, 0.09, 0.09, 0.07, 0.09, 0.04, 0.09, 0.05, 0.02, 0.07, 0.04, 0.09, 0.09, 0.09, 0.09, 0.09, 0.001, 0.04, 0.09, 0.02, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.001, 0.09, 0.07, 0.04, 0.09, 0.02, 0.11, 0.09, 0.11, 0.05, 0.12, 0.09, 0.09, 0.09, 0.05, 0.09, 0.09, 0.09, 0.09, 0.09, 0.001, 0.001, 0.09, 0.07, 0.09, 0.09, 0.05, 0.02, 0.11, 0.09, 0.11, 0.09, 0.04, 0.09, 0.02, 0.09, 0.02, 0.09, 0.12, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.11, 0.04, 0.11, 0.09, 0.09, 0.09, 0.05, 0.02, 0.09, 0.09, 0.09, 0.07, 0.07, 0.09, 0.09, 0.09, 0.09, 0.09, 0.001, 0.09, 0.09, 0.09, 0.09, 0.09, 0.02, 0.09, 0.001, 0.07, 0.09, 0.09, 0.09, 0.12, 0.09, 0.02, 0.09, 0.12, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.001, 0.04, 0.09, 0.02, 0.09, 0.07, 0.001, 0.11, 0.09, 0.07, 0.09, 0.12, 0.12, 0.09, 0.07, 0.09, 0.12, 0.09, 0.001, 0.05, 0.09, 0.09, 0.09, 0.09, 0.09, 0.02, 0.07, 0.09, 0.09, 0.07, 0.09, 0.02, 0.09, 0.07, 0.04, 0.09, 0.09, 0.09, 0.001, 0.09, 0.09, 0.02, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.04, 0.09, 0.05, 0.09, 0.09, 0.04, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.04, 0.001, 0.05, 0.09, 0.09, 0.09, 0.04, 0.09, 0.09, 0.05, 0.12, 0.02, 0.09, 0.001, 0.02, 0.02, 0.09, 0.09, 0.02, 0.04, 0.05, 0.001, 0.04, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.11, 0.04, 0.09, 0.09, 0.07, 0.001, 0.07, 0.09, 0.12, 0.09, 0.05, 0.09, 0.09, 0.09, 0.02, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.05, 0.09, 0.01, 0.09, 0.02, 0.07, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.05, 0.05, 0.09, 0.04, 0.09, 0.09, 0.04, 0.05, 0.09, 0.09, 0.02, 0.09, 0.09, 0.04, 0.09, 0.09, 0.02, 0.09, 0.09, 0.07, 0.11, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.11, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.02, 0.04, 0.11, 0.09, 0.09, 0.09, 0.09, 0.09, 0.001, 0.09, 0.09, 0.05, 0.02, 0.09, 0.09, 0.05, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.11, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.12, 0.09, 0.09, 0.09, 0.05, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.001, 0.09, 0.09, 0.09, 0.09, 0.07, 0.09, 0.09, 0.09, 0.001, 0.05, 0.09, 0.04, 0.09, 0.05, 0.09, 0.12, 0.11, 0.09, 0.001, 0.11, 0.09, 0.05, 0.09, 0.04, 0.09, 0.09, 0.09, 0.09, 0.04, 0.09, 0.09, 0.09, 0.09, 0.09, 0.12, 0.09, 0.05, 0.09, 0.09, 0.12, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.07, 0.11, 0.04, 0.09, 0.07, 0.11, 0.09, 0.09, 0.05, 0.09, 0.09, 0.09, 0.07, 0.09, 0.05, 0.09, 0.09, 0.09, 0.07, 0.07, 0.05, 0.09, 0.04, 0.09, 0.05, 0.09, 0.09, 0.12, 0.09, 0.001, 0.09, 0.02, 0.09, 0.05, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.02, 0.09, 0.09, 0.001, 0.09, 0.09, 0.04, 0.12, 0.09, 0.09, 0.09, 0.09, 0.05, 0.09, 0.09, 0.09, 0.07, 0.09, 0.09, 0.09, 0.05, 0.09, 0.09, 0.05, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.07, 0.09, 0.11, 0.07, 0.09, 0.09, 0.02, 0.09, 0.09, 0.04, 0.07, 0.12, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.04, 0.001, 0.05, 0.12, 0.001, 0.09, 0.09, 0.09, 0.09, 0.12, 0.11, 0.09, 0.05, 0.09, 0.09, 0.09, 0.09, 0.05, 0.09, 0.09, 0.09, 0.001, 0.04, 0.12, 0.02, 0.09, 0.09, 0.09, 0.09, 0.09, 0.02, 0.09, 0.001, 0.02, 0.07, 0.05, 0.09, 0.09, 0.04, 0.09, 0.001, 0.05, 0.09, 0.09, 0.09, 0.09, 0.02, 0.04, 0.12, 0.09, 0.02, 0.09, 0.09, 0.12, 0.09, 0.001, 0.11, 0.02, 0.04, 0.02, 0.07, 0.09, 0.09, 0.09, 0.04, 0.05, 0.09, 0.09, 0.09, 0.04, 0.09, 0.07, 0.04, 0.09, 0.09, 0.09, 0.09, 0.09, 0.05, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.04, 0.09, 0.12, 0.09, 0.001, 0.09, 0.02, 0.04, 0.09, 0.09, 0.05, 0.09, 0.09, 0.09, 0.04, 0.05, 0.09, 0.11, 0.09, 0.02, 0.09, 0.09, 0.001, 0.09, 0.09, 0.09, 0.09, 0.02, 0.09, 0.09, 0.09, 0.09, 0.09, 0.04, 0.001, 0.09, 0.04, 0.09, 0.09, 0.09, 0.04, 0.09, 0.09, 0.09, 0.09, 0.02, 0.09, 0.04, 0.09, 0.09, 0.07, 0.09, 0.09, 0.09, 0.02, 0.09, 0.09, 0.09, 0.001, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.001, 0.02, 0.01, 0.09, 0.09, 0.09, 0.02, 0.12, 0.11, 0.11, 0.09, 0.09, 0.04, 0.09, 0.05, 0.04, 0.09, 0.04, 0.09, 0.09, 0.09, 0.001, 0.09, 0.09, 0.09, 0.09, 0.12, 0.09, 0.09, 0.12, 0.05, 0.07, 0.001, 0.001, 0.05, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.001, 0.02, 0.09, 0.09, 0.09, 0.05, 0.09, 0.07, 0.11, 0.09, 0.09, 0.04, 0.09, 0.09, 0.12, 0.09, 0.09, 0.09, 0.02, 0.02, 0.001, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.02, 0.09, 0.09, 0.09, 0.09, 0.02, 0.12, 0.09, 0.04, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.11, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.11, 0.05, 0.09, 0.09, 0.02, 0.09, 0.09, 0.09, 0.09, 0.09, 0.02, 0.001, 0.09, 0.09, 0.09, 0.09, 0.09, 0.04, 0.09, 0.09, 0.09, 0.05, 0.09, 0.02, 0.09, 0.02, 0.09, 0.09, 0.09, 0.09, 0.07, 0.09, 0.02, 0.12, 0.07, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.07, 0.02, 0.09, 0.07, 0.09, 0.05, 0.09, 0.09, 0.001, 0.09, 0.04, 0.09, 0.09, 0.05, 0.09, 0.02, 0.12, 0.09, 0.11, 0.05, 0.02, 0.12, 0.09, 0.09, 0.07, 0.09, 0.07, 0.09, 0.09, 0.09, 0.09, 0.07, 0.02, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.07, 0.09, 0.04, 0.09, 0.09, 0.12, 0.09, 0.09, 0.001, 0.09, 0.09, 0.04, 0.09, 0.09, 0.11, 0.09, 0.09, 0.09, 0.09, 0.09, 0.07, 0.09, 0.02, 0.11, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.04, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.04, 0.09, 0.09, 0.09, 0.02, 0.09, 0.02, 0.09, 0.001, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.12, 0.07, 0.07, 0.09, 0.09, 0.001, 0.07, 0.05, 0.09, 0.04, 0.11, 0.09, 0.09, 0.11, 0.07, 0.07, 0.04, 0.09, 0.09, 0.09, 0.09, 0.001, 0.07, 0.09, 0.09, 0.04, 0.09, 0.09, 0.09, 0.09, 0.09, 0.04, 0.09, 0.09, 0.09, 0.02, 0.09, 0.09, 0.05, 0.09, 0.09, 0.09, 0.09, 0.04, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.09, 0.04, 0.09, 0.09, 0.05, 0.04, 0.09, 0.001, 0.09, 0.09, 0.11, 0.09, 0.09, 0.05, 0.07, 0.04, 0.09, 0.07];
+const tasks       = ["task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix", "task_easy_schema_fix"];
+const pointColors = ["#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75", "#1D9E75"];
+const taskColors  = {"task_easy_schema_fix": "#1D9E75", "task_medium_data_quality": "#378ADD", "task_hard_pipeline_orchestration": "#EF9F27", "task_veryhard_streaming_pipeline": "#D85A30", "task_expert_multi_source_join": "#534AB7"};
 
-// Phase background shading
-function phasePlugin(phases) {
-  return {
-    id: 'phaseShading',
-    beforeDraw(chart) {
-      const ctx  = chart.ctx;
-      const xAxis = chart.scales.x;
-      const yAxis = chart.scales.y;
-      phases.forEach(([start, end, label, color]) => {
-        const x1 = xAxis.getPixelForValue(start);
-        const x2 = xAxis.getPixelForValue(end);
-        ctx.save();
-        ctx.fillStyle = color + '18';
-        ctx.fillRect(x1, yAxis.top, x2-x1, yAxis.bottom - yAxis.top);
-        ctx.fillStyle = color + 'cc';
-        ctx.font = '10px Segoe UI';
-        ctx.fillText(label, x1+6, yAxis.top+14);
-        ctx.restore();
-      });
-    }
-  };
-}
-
-const phases = [
-  [0,  33,  "Easy",   "#4fc3f7"],
-  [34, 67,  "Medium", "#81c784"],
-  [68, 101, "Hard",   "#ffb74d"],
-];
-
-// Score chart
-new Chart(document.getElementById('scoreChart'), {
+const ctx = document.getElementById('rewardChart').getContext('2d');
+new Chart(ctx, {
   type: 'line',
-  plugins: [phasePlugin(phases)],
   data: {
-    labels,
-    datasets: [
-      {
-        label: 'Score (raw)',
-        data: rawScores,
-        borderColor: '#4fc3f744',
-        borderWidth: 1,
-        pointRadius: 0,
-        tension: 0.1,
-      },
-      {
-        label: 'Score (smoothed avg-5)',
-        data: smoothScores,
-        borderColor: '#4fc3f7',
-        backgroundColor: 'rgba(79,195,247,0.08)',
-        borderWidth: 3,
-        pointRadius: 0,
-        tension: 0.4,
-        fill: true,
-      },
-    ]
+    labels: episodes,
+    datasets: [{
+      label: 'Score',
+      data: scores,
+      borderColor: '#1D9E75',
+      backgroundColor: 'rgba(29,158,117,0.08)',
+      pointBackgroundColor: pointColors,
+      pointRadius: 3,
+      tension: 0.35,
+      fill: true,
+      borderWidth: 1.8,
+    }]
   },
   options: {
-    responsive: true, animation: false,
+    responsive: true,
     plugins: {
-      legend: { labels: { color:'#eee' } },
-      tooltip: { mode:'index', intersect:false }
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => `Score: ${ctx.parsed.y.toFixed(4)}`,
+          afterLabel: ctx => `Task: ${tasks[ctx.dataIndex].replace('task_','').replace(/_/g,' ')}`
+        }
+      }
     },
     scales: {
-      x: { ticks:{ color:'#666', maxTicksLimit:20 }, grid:{ color:'#222' } },
-      y: { min:0, max:1.05, ticks:{ color:'#666' }, grid:{ color:'#222' },
-            title:{ display:true, text:'Score (0-1)', color:'#888' } }
+      x: { title: { display: true, text: 'Episode', font: { size: 12 } } },
+      y: { min: 0, max: 1.05, title: { display: true, text: 'Score', font: { size: 12 } },
+             ticks: { callback: v => v.toFixed(2) } }
     }
   }
 });
 
-// Reward chart
-new Chart(document.getElementById('rewardChart'), {
-  type: 'line',
-  plugins: [phasePlugin(phases)],
-  data: {
-    labels,
-    datasets: [
-      {
-        label: 'Episode Reward (raw)',
-        data: rawRewards,
-        borderColor: '#81c78444',
-        borderWidth: 1,
-        pointRadius: 0,
-        tension: 0.1,
-      },
-      {
-        label: 'Episode Reward (smoothed)',
-        data: smoothRewards,
-        borderColor: '#81c784',
-        backgroundColor: 'rgba(129,199,132,0.08)',
-        borderWidth: 3,
-        pointRadius: 0,
-        tension: 0.4,
-        fill: true,
-      },
-    ]
-  },
-  options: {
-    responsive: true, animation: false,
-    plugins: {
-      legend: { labels: { color:'#eee' } },
-      tooltip: { mode:'index', intersect:false }
-    },
-    scales: {
-      x: { ticks:{ color:'#666', maxTicksLimit:20 }, grid:{ color:'#222' } },
-      y: { ticks:{ color:'#666' }, grid:{ color:'#222' },
-            title:{ display:true, text:'Reward', color:'#888' } }
-    }
-  }
+// Build legend
+const seen = {};
+const leg = document.getElementById('legend');
+tasks.forEach((t, i) => {
+  if (seen[t]) return;
+  seen[t] = true;
+  const name = t.replace('task_','').replace(/_/g,' ');
+  leg.innerHTML += `<div class="legend-item">
+    <div class="legend-dot" style="background:${taskColors[t] || '#888'}"></div>
+    <span>${name}</span>
+  </div>`;
 });
 </script>
 </body>

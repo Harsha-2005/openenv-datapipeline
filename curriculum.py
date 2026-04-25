@@ -42,7 +42,7 @@ DIFFICULTY_NAMES = {
 @dataclass
 class AgentSkillProfile:
     """Tracks an agent's skill growth across all tasks."""
-    agent_id:       str
+    agent_id:       str                          = "default_agent"
     total_episodes: int                          = 0
     task_scores:    Dict[str, List[float]]       = field(default_factory=dict)
     current_level:  int                          = 0   # index into TASK_PROGRESSION
@@ -112,6 +112,11 @@ class AgentSkillProfile:
 
     def to_json(self) -> str:
         return json.dumps(self.summary(), indent=2)
+
+    def record_advancement(self, from_task: str, to_task: str, episode: int):
+        """Record a curriculum advancement event."""
+        avg_score = self.recent_avg(from_task)
+        self.level_history.append((from_task, episode, avg_score))
 
 
 class CurriculumManager:
@@ -246,6 +251,13 @@ class CurriculumManager:
         return sorted(entries,
                       key=lambda x: (x["level_index"], x["best_task_avg"]),
                       reverse=True)
+
+    def suggest_task(self, profile: AgentSkillProfile) -> Optional[str]:
+        """Suggest the best task for the agent based on its skill profile."""
+        if profile.should_advance():
+            next_level = min(profile.current_level + 1, len(TASK_PROGRESSION) - 1)
+            return TASK_PROGRESSION[next_level][0]
+        return profile.current_task
 
 
 # ── Self-play difficulty scaler ───────────────────────────────────────────────

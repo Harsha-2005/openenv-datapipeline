@@ -1,0 +1,119 @@
+[
+  {
+    "agent": "Random",
+    "task_id": "task_easy_schema_fix",
+    "avg_score": 0.0803,
+    "avg_steps": 10.0,
+    "avg_time": 0.111,
+    "best_score": 0.18,
+    "scores": [
+      0.06,
+      0.001,
+      0.18
+    ]
+  },
+  {
+    "agent": "Random",
+    "task_id": "task_medium_data_quality",
+    "avg_score": 0.2383,
+    "avg_steps": 20.0,
+    "avg_time": 0.151,
+    "best_score": 0.345,
+    "scores": [
+      0.345,
+      0.185,
+      0.185
+    ]
+  },
+  {
+    "agent": "Random",
+    "task_id": "task_hard_pipeline_orchestration",
+    "avg_score": 0.635,
+    "avg_steps": 40.0,
+    "avg_time": 0.415,
+    "best_score": 0.945,
+    "scores": [
+      0.945,
+      0.545,
+      0.415
+    ]
+  },
+  {
+    "agent": "Greedy",
+    "task_id": "task_easy_schema_fix",
+    "avg_score": 0.001,
+    "avg_steps": 7.0,
+    "avg_time": 0.025,
+    "best_score": 0.001,
+    "scores": [
+      0.001,
+      0.001,
+      0.001
+    ]
+  },
+  {
+    "agent": "Greedy",
+    "task_id": "task_medium_data_quality",
+    "avg_score": 0.14,
+    "avg_steps": 5.0,
+    "avg_time": 0.033,
+    "best_score": 0.14,
+    "scores": [
+      0.14,
+      0.14,
+      0.14
+    ]
+  },
+  {
+    "agent": "Greedy",
+    "task_id": "task_hard_pipeline_orchestration",
+    "avg_score": 0.615,
+    "avg_steps": 12.0,
+    "avg_time": 0.148,
+    "best_score": 0.615,
+    "scores": [
+      0.615,
+      0.615,
+      0.615
+    ]
+  },
+  {
+    "agent": "Fixed-Strategy",
+    "task_id": "task_easy_schema_fix",
+    "avg_score": 0.09,
+    "avg_steps": 10.0,
+    "avg_time": 0.051,
+    "best_score": 0.09,
+    "scores": [
+      0.09,
+      0.09,
+      0.09
+    ]
+  },
+  {
+    "agent": "Fixed-Strategy",
+    "task_id": "task_medium_data_quality",
+    "avg_score": 0.325,
+    "avg_steps": 12.0,
+    "avg_time": 0.083,
+    "best_score": 0.325,
+    "scores": [
+      0.325,
+      0.325,
+      0.325
+    ]
+  },
+  {
+    "agent": "Fixed-Strategy",
+    "task_id": "task_hard_pipeline_orchestration",
+    "avg_score": 0.895,
+    "avg_steps": 16.0,
+    "avg_time": 0.136,
+    "best_score": 0.945,
+    "scores": [
+      0.795,
+      0.945,
+      0.945
+    ]
+  }
+]

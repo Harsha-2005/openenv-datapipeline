@@ -15,9 +15,7 @@ pip-log.txt
 pip-delete-this-directory.txt
 
 # Virtual environments
-.env
 .venv
-env/
 venv/
 ENV/
 env.bak/
@@ -190,3 +188,18 @@ scratch/
 *.tar.gz
 *.rar
 *.7z
+
+# ------------------------------------------------------------
+# Generated output files (training/replay/demo artifacts)
+# ------------------------------------------------------------
+replay_ep*.html
+replay_final.html
+training_results.html
+training_report.html
+reward_curves.html
+all_tasks_comparison.html
+reward_curve.json
+replays/
+ppo_checkpoints/
+uv.lock
+train_replay_patch.py

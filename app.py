@@ -12,7 +12,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from pydantic import BaseModel
 
 from env.environment import DataPipelineEnv
@@ -135,9 +135,40 @@ def reset(req: Optional[ResetRequest] = None):
 
     try:
         obs = _session.reset(task_id=task_id, seed=seed)
-        return obs.dict()
+        return obs.model_dump()
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+import math
+import pandas as pd
+
+def _sanitize_for_json(obj):
+    """Recursively replaces NaN, Inf, and pd.NA with None for strict JSON serialization."""
+    # pd.NA from nullable Int64/Float64 is not JSON serializable
+    if obj is pd.NA:
+        return None
+    try:
+        if pd.isna(obj):
+            return None
+    except (ValueError, TypeError):
+        pass
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    elif isinstance(obj, dict):
+        return {str(k): _sanitize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple, set)):
+        return [_sanitize_for_json(v) for v in obj]
+    else:
+        # Fallback for numpy float/int scalars escaping standard isinstance
+        if hasattr(obj, 'item') and callable(getattr(obj, 'item')):
+            val = obj.item()
+            if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
+                return None
+            return val
+    return obj
 
 
 @app.post("/step")
@@ -164,11 +195,15 @@ def step(req: StepRequest):
 
     try:
         obs = _session.step(action)
+        last_reward = 0.0
+        if _session._env and _session._env.history:
+            last_reward = _session._env.history[-1].reward
+
         # Wrap in StepResult shape for backward compatibility with inference.py
-        return {
-            "observation": obs.dict(),
+        payload = {
+            "observation": obs.model_dump(),
             "reward": {
-                "value":       0.0,   # granular reward in history
+                "value":       last_reward,
                 "cumulative":  _session._env._cumulative_reward if _session._env else 0.0,
                 "components":  {},
                 "explanation": obs.hint,
@@ -180,6 +215,7 @@ def step(req: StepRequest):
                 "action_result": obs.hint,
             },
         }
+        return _sanitize_for_json(payload)
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -191,7 +227,7 @@ def state():
         s = _session.state()
         if s is None:
             raise HTTPException(status_code=400, detail="Call /reset first.")
-        return s.dict()
+        return s.model_dump()
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -204,15 +240,49 @@ def root():
         "version":     "1.0.0",
         "description": "Debug broken ETL pipelines. Real-world agent benchmark.",
         "endpoints": {
-            "GET  /health":  "Health check",
-            "GET  /tasks":   "List all tasks",
-            "POST /reset":   "Reset environment for a task",
-            "POST /step":    "Apply an action",
-            "GET  /state":   "Get full internal state",
-            "GET  /docs":    "Interactive API docs (Swagger)",
+            "GET  /health":       "Health check",
+            "GET  /tasks":        "List all tasks",
+            "POST /reset":        "Reset environment for a task",
+            "POST /step":         "Apply an action",
+            "GET  /state":        "Get full internal state",
+            "GET  /dashboard":    "Interactive web dashboard",
+            "GET  /demo":         "Auto-running demo presentation",
+            "GET  /compete":      "Multi-agent competition mode",
+            "GET  /api/benchmark": "Run benchmark comparison",
+            "GET  /docs":         "Interactive API docs (Swagger)",
         },
         "tasks": task_ids,
     }
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard():
+    """Serve the interactive web dashboard."""
+    from dashboard import get_dashboard_html
+    return HTMLResponse(content=get_dashboard_html(), status_code=200)
+
+@app.get("/demo", response_class=HTMLResponse)
+def demo_mode():
+    """Serve the standalone auto-demo presentation."""
+    from demo import get_demo_html
+    return HTMLResponse(content=get_demo_html(), status_code=200)
+
+@app.get("/compete", response_class=HTMLResponse)
+def compete_mode():
+    """Serve the side-by-side competition mode."""
+    from compete import get_compete_html
+    return HTMLResponse(content=get_compete_html(), status_code=200)
+
+
+@app.get("/api/benchmark")
+def run_benchmark_api():
+    """Run benchmark comparison agents and return results as JSON."""
+    try:
+        from benchmarks.run_benchmarks import run_all_benchmarks
+        results = run_all_benchmarks(episodes=2)
+        return {"status": "ok", "results": results}
+    except Exception as e:
+        return {"status": "error", "message": str(e), "results": []}
 
 
 # ---------------------------------------------------------------------------

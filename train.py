@@ -90,7 +90,7 @@ def parse_args() -> argparse.Namespace:
 # ── Replay helper ─────────────────────────────────────────────────────────────
 
 def maybe_save_replay(
-    env: DataPipelineEnvironment,
+    env: DataPipelineEnv,
     episode: int,
     task_id: str,
     score: float,
@@ -123,7 +123,7 @@ def maybe_save_replay(
             final_score = score,
             output_path = out_path,
         )
-        print(f"  [replay] Saved → {out_path}")
+        print(f"  [replay] Saved -> {out_path}")
     except Exception as exc:
         print(f"  [replay] WARNING: could not save replay: {exc}", file=sys.stderr)
 
@@ -135,7 +135,7 @@ def run_episode(
     seed:       int,
     noise:      float,
     episode:    int,
-) -> tuple[float, int, DataPipelineEnvironment]:
+) -> tuple[float, int, DataPipelineEnv]:
     """
     Run one full episode against the live HF Space environment.
 
@@ -143,9 +143,9 @@ def run_episode(
     -------
     score : float   — final submitted score (or 0.0 on failure)
     steps : int     — number of steps taken
-    env   : DataPipelineEnvironment  — populated .history for replay
+    env   : DataPipelineEnv  — populated .history for replay
     """
-    env = DataPipelineEnvironment(task_id=task_id, seed=seed)
+    env = DataPipelineEnv(task_id=task_id, seed=seed)
 
     try:
         obs = env.reset()
@@ -316,7 +316,7 @@ def train(args: argparse.Namespace) -> None:
                 suggested = curriculum_mgr.suggest_task(skill_profile)
                 if suggested and suggested != current_task:
                     current_task = suggested
-                    print(f"  [curriculum] Manager override → {current_task}")
+                    print(f"  [curriculum] Manager override -> {current_task}")
 
         # ── Progress summary every 25 episodes ────────────────────────────
         if (ep + 1) % 25 == 0:
@@ -324,10 +324,10 @@ def train(args: argparse.Namespace) -> None:
             avg    = sum(r["score"] for r in recent) / len(recent)
             best   = max(r["score"] for r in training_results)
             elapsed = time.time() - t0
-            print(f"\n  ── Episode {ep+1}/{args.steps} | "
+            print(f"\n  -- Episode {ep+1}/{args.steps} | "
                   f"avg(last 25)={avg:.4f} | best={best:.4f} | "
                   f"task={current_task.replace('task_','')} | "
-                  f"elapsed={elapsed:.0f}s ──\n")
+                  f"elapsed={elapsed:.0f}s --\n")
 
     # ── Post-training ────────────────────────────────────────────────────────
     elapsed = time.time() - t0
@@ -347,7 +347,7 @@ def train(args: argparse.Namespace) -> None:
         training_results = training_results,
         output_path      = "training_results.html",
     )
-    print(f"\n  Reward chart   → {chart_path}")
+    print(f"\n  Reward chart   -> {chart_path}")
 
     # Save final episode replay if not already saved
     if not args.no_replay:
@@ -369,14 +369,18 @@ def train(args: argparse.Namespace) -> None:
                 final_score = last_res["score"],
                 output_path = final_replay,
             )
-            print(f"  Final replay   → {final_replay}")
+            print(f"  Final replay   -> {final_replay}")
 
     # ── Optional PPO fine-tuning ──────────────────────────────────────────
     if args.ppo:
         run_ppo_finetuning(training_results)
 
-    print("\nDone. Open training_results.html and any replay_ep*.html in your browser.")
+    # Output enhanced training report
+    from analytics import generate_training_report
+    report_path = os.path.join(args.replay_dir, "training_report.html")
+    generate_training_report(training_results, output_path=report_path)
 
+    print("\nDone. Open training_report.html and any replay_ep*.html in your browser.")
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
