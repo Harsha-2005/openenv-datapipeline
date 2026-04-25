@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Replay — Episode 69 · Hard Pipeline Orchestration</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family:system-ui,sans-serif; background:#f8f8f5; color:#2c2c2a; padding:1.5rem; }
+
+  /* Stats bar */
+  .stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:1rem; }
+  .stat{ background:#f1efe8; border-radius:8px; padding:0.75rem 1rem; }
+  .stat-label{ font-size:11px; color:#888780; margin-bottom:2px; }
+  .stat-val{ font-size:1.4rem; font-weight:500; }
+
+  /* Cards */
+  .card{ background:#fff; border:0.5px solid #d3d1c7; border-radius:12px; padding:1rem 1.25rem; margin-bottom:1rem; }
+  .card-title{ font-size:12px; font-weight:500; color:#5f5e5a; margin-bottom:10px; }
+
+  /* Timeline */
+  #timeline{ display:flex; align-items:center; gap:4px; overflow-x:auto; padding-bottom:4px; }
+  .tl-dot{ width:10px; height:10px; border-radius:50%; flex-shrink:0; border:1.5px solid transparent; cursor:pointer;
+            transition:transform 0.1s; }
+  .tl-dot:hover{ transform:scale(1.4); }
+  .tl-dot.done{ background:#1D9E75; border-color:#0F6E56; }
+  .tl-dot.current{ background:#378ADD; border-color:#185FA5; }
+  .tl-dot.future{ background:#f1efe8; border-color:#b4b2a9; }
+  .tl-line{ height:1.5px; flex:1; min-width:4px; transition:background 0.25s; }
+
+  /* Step detail */
+  .step-num{ font-size:22px; font-weight:500; }
+  .detail-row{ display:flex; gap:20px; font-size:12px; margin-top:10px; }
+  .detail-row span:first-child{ color:#888780; display:block; margin-bottom:2px; font-size:11px; }
+
+  /* Action log */
+  .log-row{ display:flex; align-items:center; gap:10px; padding:7px 0;
+             border-bottom:0.5px solid #d3d1c7; font-size:13px; }
+  .log-row.active{ background:#f1efe8; border-radius:8px; padding:7px 8px; margin:0 -8px; }
+  .log-step{ font-size:11px; color:#888780; min-width:20px; }
+  .log-desc{ flex:1; color:#5f5e5a; }
+  .log-rew{ font-size:12px; font-weight:500; min-width:38px; text-align:right; }
+
+  /* Action chips */
+  .chip{ display:inline-block; font-size:11px; font-weight:500; padding:2px 8px; border-radius:6px; }
+  .chip-inspect   { background:#E6F1FB; color:#0C447C; }
+  .chip-cast      { background:#EEEDFE; color:#3C3489; }
+  .chip-fill      { background:#EAF3DE; color:#27500A; }
+  .chip-drop      { background:#FAEEDA; color:#633806; }
+  .chip-filter    { background:#FAECE7; color:#712B13; }
+  .chip-validate  { background:#E1F5EE; color:#085041; }
+  .chip-submit    { background:#E1F5EE; color:#085041; }
+  .chip-reorder   { background:#FBEAF0; color:#72243E; }
+
+  /* Controls */
+  .controls{ display:flex; align-items:center; gap:10px; justify-content:center; margin-top:1rem; }
+  button{ background:transparent; border:0.5px solid #b4b2a9; border-radius:8px; padding:6px 18px;
+           font-size:13px; cursor:pointer; transition:background 0.15s; }
+  button:hover{ background:#f1efe8; }
+  button:active{ transform:scale(0.97); }
+  .kb-hint{ font-size:11px; color:#b4b2a9; margin-left:6px; }
+
+  /* Two-col layout */
+  .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+  @media(max-width:600px){ .two-col{ grid-template-columns:1fr; } .stats{ grid-template-columns:repeat(2,1fr); } }
+
+  @media(prefers-color-scheme:dark){
+    body{ background:#1e1e1c; color:#d3d1c7; }
+    .stat{ background:#2c2c2a; }
+    .stat-label,.log-step,.kb-hint{ color:#888780; }
+    .card{ background:#252523; border-color:#444441; }
+    .card-title{ color:#888780; }
+    .log-row{ border-color:#444441; }
+    .log-row.active,.tl-dot.future{ background:#2c2c2a; }
+    .tl-dot.future{ border-color:#5f5e5a; }
+    button{ border-color:#5f5e5a; }
+    button:hover{ background:#2c2c2a; }
+    .chip-inspect  { background:#042C53; color:#B5D4F4; }
+    .chip-cast     { background:#26215C; color:#CECBF6; }
+    .chip-fill     { background:#173404; color:#C0DD97; }
+    .chip-drop     { background:#412402; color:#FAC775; }
+    .chip-filter   { background:#4A1B0C; color:#F5C4B3; }
+    .chip-validate { background:#04342C; color:#9FE1CB; }
+    .chip-submit   { background:#04342C; color:#9FE1CB; }
+    .chip-reorder  { background:#4B1528; color:#F4C0D1; }
+    .log-desc{ color:#b4b2a9; }
+  }
+</style>
+</head>
+<body>
+
+<div style="margin-bottom:1rem">
+  <div style="font-size:1.15rem;font-weight:500">Replay — Episode 69</div>
+  <div style="font-size:13px;color:#888780">Hard Pipeline Orchestration &nbsp;·&nbsp; 17 steps recorded</div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="stat-label">Task</div>
+    <div class="stat-val" style="font-size:14px;margin-top:3px">Hard Pipeline Orchestration</div></div>
+  <div class="stat"><div class="stat-label">Episode</div>
+    <div class="stat-val">69</div></div>
+  <div class="stat"><div class="stat-label">Final score</div>
+    <div class="stat-val" id="hdr-score">0.9810</div></div>
+  <div class="stat"><div class="stat-label">Steps used</div>
+    <div class="stat-val" id="hdr-steps">— / 17</div></div>
+</div>
+
+<!-- Timeline -->
+<div class="card">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <span class="card-title" style="margin:0">Episode timeline — click any dot to jump</span>
+    <span style="font-size:11px;color:#888780" id="tl-label">Step 1 of 17</span>
+  </div>
+  <div id="timeline"></div>
+  <div style="display:flex;justify-content:space-between;font-size:10px;color:#888780;margin-top:6px">
+    <span>step 1</span><span>step 8</span><span>step 17</span>
+  </div>
+</div>
+
+<!-- Step detail + Chart -->
+<div class="two-col">
+
+  <div class="card">
+    <div class="card-title">Current step</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <span class="step-num" id="d-stepnum">1</span>
+      <span class="chip" id="d-chip">inspect</span>
+    </div>
+    <p style="font-size:13px;color:#5f5e5a;margin-bottom:10px;line-height:1.5" id="d-desc">—</p>
+    <div class="detail-row">
+      <div><span>Reward</span><span style="font-size:16px;font-weight:500" id="d-reward">—</span></div>
+      <div><span>Cumulative</span><span style="font-size:16px;font-weight:500" id="d-cum">—</span></div>
+      <div><span>Bugs left</span><span style="font-size:16px;font-weight:500" id="d-bugs">—</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Reward curve</div>
+    <canvas id="mini-chart" height="130"></canvas>
+  </div>
+
+</div>
+
+<!-- Action log -->
+<div class="card">
+  <div class="card-title">Action log (last 6 steps)</div>
+  <div id="action-log"></div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <button onclick="seek(currentStep-1)">← Prev</button>
+  <button id="play-btn" onclick="togglePlay()">Play ▶</button>
+  <button onclick="seek(currentStep+1)">Next →</button>
+  <span class="kb-hint">← → arrow keys also work</span>
+</div>
+
+<script>
+const STEPS = [
+  {
+    "step": 1,
+    "action": "inspect",
+    "params": {},
+    "reward": 0.0,
+    "cumulative_reward": 0.0,
+    "bugs_remaining": 13,
+    "description": "Scanned 107 rows, 9 cols. 13 bugs flagged."
+  },
+  {
+    "step": 2,
+    "action": "inspect",
+    "params": {},
+    "reward": -0.07,
+    "cumulative_reward": -0.07,
+    "bugs_remaining": 13,
+    "description": "Re-scanned (repeat penalty applied)."
+  },
+  {
+    "step": 3,
+    "action": "cast_column",
+    "params": {
+      "column": "order_id",
+      "dtype": "int64"
+    },
+    "reward": 0.04,
+    "cumulative_reward": -0.03,
+    "bugs_remaining": 12,
+    "description": "Cast 'order_id' float \u2192 int64."
+  },
+  {
+    "step": 4,
+    "action": "drop_duplicates",
+    "params": {},
+    "reward": 0.06,
+    "cumulative_reward": 0.03,
+    "bugs_remaining": 11,
+    "description": "Removed 4 duplicate rows."
+  },
+  {
+    "step": 5,
+    "action": "fill_nulls",
+    "params": {
+      "column": "order_value",
+      "value": "median"
+    },
+    "reward": 0.06,
+    "cumulative_reward": 0.09,
+    "bugs_remaining": 10,
+    "description": "Filled 12 nulls in 'order_value' with median 142.5."
+  },
+  {
+    "step": 6,
+    "action": "reorder_stages",
+    "params": {
+      "order": [
+        "ingest",
+        "cast",
+        "validate",
+        "export"
+      ]
+    },
+    "reward": 0.1,
+    "cumulative_reward": 0.19,
+    "bugs_remaining": 9,
+    "description": "Reordered stages: ingest \u2192 cast \u2192 validate \u2192 export."
+  },
+  {
+    "step": 7,
+    "action": "filter_outliers",
+    "params": {
+      "column": "fraud_score"
+    },
+    "reward": 0.06,
+    "cumulative_reward": 0.25,
+    "bugs_remaining": 8,
+    "description": "Filtered 3 outliers in 'fraud_score' > 1.0."
+  },
+  {
+    "step": 8,
+    "action": "cast_column",
+    "params": {
+      "column": "order_value",
+      "dtype": "float64"
+    },
+    "reward": 0.06,
+    "cumulative_reward": 0.31,
+    "bugs_remaining": 7,
+    "description": "Cast 'order_value' object \u2192 float64."
+  },
+  {
+    "step": 9,
+    "action": "fill_nulls",
+    "params": {
+      "column": "discount_pct",
+      "value": 0.0
+    },
+    "reward": 0.06,
+    "cumulative_reward": 0.37,
+    "bugs_remaining": 6,
+    "description": "Filled 5 nulls in 'discount_pct' with 0.0."
+  },
+  {
+    "step": 10,
+    "action": "apply_business_rule",
+    "params": {
+      "rule": "discount_lte_1"
+    },
+    "reward": 0.08,
+    "cumulative_reward": 0.45,
+    "bugs_remaining": 5,
+    "description": "Applied discount_lte_1: clipped 2 rows."
+  },
+  {
+    "step": 11,
+    "action": "apply_business_rule",
+    "params": {
+      "rule": "currency_3char"
+    },
+    "reward": 0.08,
+    "cumulative_reward": 0.53,
+    "bugs_remaining": 4,
+    "description": "Applied currency_3char: renamed 'US' \u2192 'USD'."
+  },
+  {
+    "step": 12,
+    "action": "rename_column",
+    "params": {
+      "old_name": "cust_id",
+      "new_name": "customer_id"
+    },
+    "reward": 0.04,
+    "cumulative_reward": 0.57,
+    "bugs_remaining": 3,
+    "description": "Renamed 'cust_id' \u2192 'customer_id'."
+  },
+  {
+    "step": 13,
+    "action": "drop_nulls",
+    "params": {
+      "column": "customer_id"
+    },
+    "reward": 0.04,
+    "cumulative_reward": 0.61,
+    "bugs_remaining": 2,
+    "description": "Dropped 2 rows with null customer_id."
+  },
+  {
+    "step": 14,
+    "action": "validate",
+    "params": {},
+    "reward": 0.0,
+    "cumulative_reward": 0.61,
+    "bugs_remaining": 1,
+    "description": "Validation score: 0.940. 1 bug remaining."
+  },
+  {
+    "step": 15,
+    "action": "apply_business_rule",
+    "params": {
+      "rule": "country_2char"
+    },
+    "reward": 0.08,
+    "cumulative_reward": 0.69,
+    "bugs_remaining": 0,
+    "description": "Applied country_2char: 'IND' \u2192 'IN'."
+  },
+  {
+    "step": 16,
+    "action": "validate",
+    "params": {},
+    "reward": 0.0,
+    "cumulative_reward": 0.69,
+    "bugs_remaining": 0,
+    "description": "All checks passed. 0 bugs. Ready to submit."
+  },
+  {
+    "step": 17,
+    "action": "submit",
+    "params": {},
+    "reward": 0.291,
+    "cumulative_reward": 0.981,
+    "bugs_remaining": 0,
+    "description": "Submitted. Final score: 0.981."
+  }
+];
+const CHIP_MAP = {"inspect": "chip-inspect", "cast_column": "chip-cast", "drop_nulls": "chip-drop", "fill_nulls": "chip-fill", "drop_duplicates": "chip-drop", "filter_outliers": "chip-filter", "rename_column": "chip-cast", "reorder_stages": "chip-reorder", "apply_business_rule": "chip-filter", "validate": "chip-validate", "submit": "chip-submit"};
+
+let currentStep = 0;
+let playing = false;
+let playTimer = null;
+let chart = null;
+
+function chipClass(action) {
+  return CHIP_MAP[action] || 'chip-inspect';
+}
+
+function buildTimeline() {
+  const tl = document.getElementById('timeline');
+  tl.innerHTML = '';
+  STEPS.forEach((s, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'tl-dot ' + (i < currentStep ? 'done' : i === currentStep ? 'current' : 'future');
+    dot.title = `Step ${i+1}: ${s.action}`;
+    dot.onclick = () => seek(i);
+    tl.appendChild(dot);
+    if (i < STEPS.length - 1) {
+      const line = document.createElement('div');
+      line.className = 'tl-line';
+      line.style.background = i < currentStep ? '#1D9E75' : '#d3d1c7';
+      tl.appendChild(line);
+    }
+  });
+  document.getElementById('tl-label').textContent = `Step ${currentStep+1} of ${STEPS.length}`;
+}
+
+function buildLog() {
+  const log = document.getElementById('action-log');
+  log.innerHTML = '';
+  const start = Math.max(0, currentStep - 5);
+  const slice = STEPS.slice(start, currentStep + 1);
+  slice.forEach((s, ii) => {
+    const idx = start + ii;
+    const row = document.createElement('div');
+    row.className = 'log-row' + (idx === currentStep ? ' active' : '');
+    const rew = s.reward >= 0 ? `+${s.reward.toFixed(2)}` : s.reward.toFixed(2);
+    const rewColor = s.reward >= 0 ? '#1D9E75' : '#D85A30';
+    row.innerHTML = `
+      <span class="log-step">${idx+1}</span>
+      <span class="chip ${chipClass(s.action)}">${s.action}</span>
+      <span class="log-desc">${s.description}</span>
+      <span class="log-rew" style="color:${rewColor}">${rew}</span>
+    `;
+    log.appendChild(row);
+  });
+}
+
+function updateDetail() {
+  const s = STEPS[currentStep];
+  document.getElementById('d-stepnum').textContent = currentStep + 1;
+  const chip = document.getElementById('d-chip');
+  chip.textContent = s.action;
+  chip.className = 'chip ' + chipClass(s.action);
+  document.getElementById('d-desc').textContent = s.description;
+  const r = s.reward;
+  document.getElementById('d-reward').textContent = (r >= 0 ? '+' : '') + r.toFixed(3);
+  document.getElementById('d-reward').style.color = r >= 0 ? '#1D9E75' : '#D85A30';
+  document.getElementById('d-cum').textContent = s.cumulative_reward.toFixed(3);
+  document.getElementById('d-bugs').textContent = s.bugs_remaining;
+  document.getElementById('hdr-steps').textContent = `${currentStep+1} / ${STEPS.length}`;
+}
+
+function buildChart() {
+  const ctx = document.getElementById('mini-chart').getContext('2d');
+  const labels = STEPS.map((_, i) => i + 1);
+  const data   = STEPS.map(s => s.cumulative_reward);
+
+  if (chart) chart.destroy();
+
+  const isDark = window.matchMedia('(prefers-color-scheme:dark)').matches;
+  const gridColor = isDark ? 'rgba(180,178,169,0.1)' : 'rgba(136,135,128,0.12)';
+  const tickColor = isDark ? '#888780' : '#5f5e5a';
+
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        segment: {
+          borderColor: ctx => ctx.p0DataIndex < currentStep ? '#1D9E75' : '#b4b2a9',
+        },
+        pointBackgroundColor: data.map((_, i) =>
+          i === currentStep ? '#378ADD' : (i < currentStep ? '#1D9E75' : '#b4b2a9')
+        ),
+        pointRadius: data.map((_, i) => i === currentStep ? 5 : 2),
+        tension: 0.35,
+        fill: false,
+        borderWidth: 1.8,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: c => `Score: ${c.parsed.y.toFixed(4)}` } } },
+      scales: {
+        x: { display: false },
+        y: {
+          min: Math.min(-0.1, Math.min(...data) - 0.05),
+          max: Math.max(1.05, Math.max(...data) + 0.05),
+          ticks: { font: { size: 10 }, color: tickColor, maxTicksLimit: 5,
+                    callback: v => v.toFixed(2) },
+          grid: { color: gridColor },
+          border: { display: false },
+        }
+      },
+      animation: { duration: 150 }
+    }
+  });
+}
+
+function seek(idx) {
+  if (idx < 0 || idx >= STEPS.length) return;
+  currentStep = idx;
+  buildTimeline();
+  buildLog();
+  updateDetail();
+  buildChart();
+}
+
+function togglePlay() {
+  playing = !playing;
+  document.getElementById('play-btn').textContent = playing ? 'Pause ⏸' : 'Play ▶';
+  if (playing) {
+    if (currentStep >= STEPS.length - 1) seek(0);
+    playTimer = setInterval(() => {
+      if (currentStep >= STEPS.length - 1) { togglePlay(); return; }
+      seek(currentStep + 1);
+    }, 900);
+  } else {
+    clearInterval(playTimer);
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') seek(currentStep + 1);
+  if (e.key === 'ArrowLeft')  seek(currentStep - 1);
+  if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+});
+
+seek(0);
+</script>
+</body>
+</html>

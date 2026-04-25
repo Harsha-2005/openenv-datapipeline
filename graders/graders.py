@@ -204,3 +204,19 @@ def grade_expert(state: PipelineState) -> float:
 # Register new graders
 GRADERS["task_veryhard_streaming_pipeline"] = grade_veryhard
 GRADERS["task_expert_multi_source_join"]    = grade_expert
+
+# ---------------------------------------------------------------------------
+# score_pipeline — unified entry point used by environment.py and tests
+# ---------------------------------------------------------------------------
+
+def score_pipeline(state: PipelineState, task_id: str) -> float:
+    """
+    Route to the correct grader by task_id.
+    Falls back to grade() for backward compatibility.
+    Returns a float in open interval (0.001, 0.999).
+    """
+    grader = GRADERS.get(task_id)
+    if grader is None:
+        raise ValueError(f"No grader registered for task_id={task_id!r}. "
+                         f"Available: {list(GRADERS.keys())}")
+    return grader(state)

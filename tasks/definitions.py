@@ -433,3 +433,92 @@ try:
     TASK_INFO.extend(EXTRA_TASK_INFO)
 except ImportError:
     pass  # extra tasks are optional — base 3 tasks always available
+
+# ---------------------------------------------------------------------------
+# TASK_REGISTRY — wraps each task builder with build_state() + config
+# Used by DataPipelineEnv.reset() and DataPipelineEnv._get_task_cfg()
+# ---------------------------------------------------------------------------
+
+class _TaskEntry:
+    """Thin wrapper giving env/environment.py the .build_state() and .config it expects."""
+
+    def __init__(self, task_id: str, builder_fn, task_info: dict):
+        self.task_id   = task_id
+        self._builder  = builder_fn
+        self.max_steps = task_info.get("max_steps", 40)
+        # .config exposes schema/rules for bug-count heuristic in environment.py
+        self.config    = {
+            "expected_schema":      {},   # populated per-task below
+            "business_rules":       [],
+            "required_stage_order": [],
+        }
+
+    def build_state(self, seed: int = 42):
+        """Call the underlying task builder function."""
+        import inspect
+        sig = inspect.signature(self._builder)
+        if "seed" in sig.parameters:
+            return self._builder(seed=seed)
+        return self._builder()
+
+
+def _build_registry() -> dict:
+    registry = {}
+
+    # Merge base + extra builders
+    all_builders = dict(TASK_BUILDERS)
+    all_info     = {t["task_id"]: t for t in TASK_INFO}
+
+    for task_id, builder_fn in all_builders.items():
+        info    = all_info.get(task_id, {"max_steps": 40})
+        entry   = _TaskEntry(task_id, builder_fn, info)
+
+        # Populate schema config per task
+        if task_id == "task_easy_schema_fix":
+            entry.config["expected_schema"] = {
+                "order_id": "int64", "product_id": "int64",
+                "quantity": "int64", "price": "float64",
+            }
+            entry.config["business_rules"] = ["discount_lte_1"]
+
+        elif task_id == "task_medium_data_quality":
+            entry.config["expected_schema"] = {
+                "order_id": "int64", "customer_id": "int64",
+                "order_value": "float64", "discount_pct": "float64",
+            }
+            entry.config["business_rules"] = ["discount_lte_1", "fraud_score_lte_1"]
+
+        elif task_id == "task_hard_pipeline_orchestration":
+            entry.config["expected_schema"] = {
+                "txn_id": "int64", "amount": "float64",
+                "fraud_score": "float64",
+            }
+            entry.config["business_rules"] = [
+                "fraud_score_lte_1", "currency_3char", "country_2char"
+            ]
+            entry.config["required_stage_order"] = [
+                "ingest", "validate", "transform", "enrich", "load"
+            ]
+
+        elif task_id == "task_veryhard_streaming_pipeline":
+            entry.config["business_rules"] = [
+                "fraud_score_lte_1", "currency_3char", "country_2char"
+            ]
+            entry.config["required_stage_order"] = [
+                "ingest", "validate", "transform", "enrich", "load"
+            ]
+
+        elif task_id == "task_expert_multi_source_join":
+            entry.config["business_rules"] = [
+                "discount_lte_1", "fraud_score_lte_1",
+                "currency_3char", "country_2char"
+            ]
+            entry.config["required_stage_order"] = [
+                "ingest", "validate", "transform", "enrich", "load"
+            ]
+
+        registry[task_id] = entry
+    return registry
+
+
+TASK_REGISTRY = _build_registry()

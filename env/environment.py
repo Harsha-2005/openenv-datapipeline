@@ -1,584 +1,435 @@
 """
-DataPipelineEnv — Core environment engine.
-Implements reset(), step(), state() following OpenEnv spec.
+env/environment.py  —  OpenEnv Data Pipeline Debugger
+=======================================================
+Root-cause fix: Observation model requires task_id, step_count, max_steps,
+pipeline_stage, data_sample, schema_info, error_log, metrics,
+available_actions, hint, done.  It has NO success/message/reward/score fields.
+
+All action dispatch now builds correct Observation objects from PipelineState.
+StepRecord + env.history preserved for Replay Dashboard.
 """
 
 from __future__ import annotations
-import copy
-import random
-from typing import Any, Dict, List, Optional, Tuple
+
+import time
+from dataclasses import dataclass, field
+from typing import Any, List, Optional, Tuple
+
+import pandas as pd
 
 from env.models import (
-    Action, ActionType, Observation, PipelineMetrics,
-    PipelineState, Reward, SchemaField, StepResult,
-)
-from tasks.definitions import TASK_BUILDERS, TASK_INFO
-from graders.graders import grade
-from tasks.definitions import (
-    MEDIUM_RULES, HARD_RULES,
-    _compute_metrics, HARD_STAGE_ORDER_CORRECT, HARD_WRONG_STAGE_ORDER,
+    Action,
+    ActionType,
+    Observation,
+    PipelineMetrics,
+    PipelineState,
+    SchemaField,
 )
 
-# Extra task rules (very_hard + expert)
-try:
-    from tasks.extra_tasks import EXTRA_RULES
-except ImportError:
-    EXTRA_RULES = {}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# StepRecord  — replay dashboard history entry
+# ─────────────────────────────────────────────────────────────────────────────
+
+@dataclass
+class StepRecord:
+    """One step snapshot for the Replay Dashboard."""
+    step:              int
+    action:            str
+    params:            dict
+    reward:            float
+    cumulative_reward: float
+    bugs_remaining:    int
+    description:       str
+    timestamp_ms:      float = field(default_factory=lambda: time.time() * 1000)
+
+    def to_dict(self) -> dict:
+        return {
+            "step":              self.step,
+            "action":            self.action,
+            "params":            self.params,
+            "reward":            round(self.reward, 4),
+            "cumulative_reward": round(self.cumulative_reward, 4),
+            "bugs_remaining":    self.bugs_remaining,
+            "description":       self.description,
+            "timestamp_ms":      round(self.timestamp_ms, 1),
+        }
 
 
-# ---------------------------------------------------------------------------
-# Environment
-# ---------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
+# Internal action result  (private — never returned to callers)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@dataclass
+class _ActionResult:
+    reward:      float
+    message:     str
+    score:       Optional[float] = None
+    done:        bool            = False
+    error_lines: List[str]       = field(default_factory=list)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _clip(v: float) -> float:
+    return max(0.001, min(0.999, v))
+
+
+def _df_to_data(df: pd.DataFrame) -> List[dict]:
+    return df.where(pd.notnull(df), None).to_dict(orient="records")
+
+
+def _recompute_metrics(data: List[dict], schema: List[SchemaField]) -> PipelineMetrics:
+    if not data:
+        return PipelineMetrics()
+    total = len(data)
+    cols  = [s.name for s in schema]
+
+    non_null     = sum(1 for row in data for c in cols if row.get(c) is not None)
+    completeness = non_null / (total * len(cols)) if cols else 0.0
+
+    seen, unique = set(), 0
+    for row in data:
+        key = tuple(sorted((k, str(v)) for k, v in row.items()))
+        if key not in seen:
+            seen.add(key); unique += 1
+    uniqueness = unique / total
+
+    import random
+    return PipelineMetrics(
+        completeness  = round(min(1.0, completeness), 4),
+        uniqueness    = round(min(1.0, uniqueness),   4),
+        validity      = round(min(1.0, completeness * uniqueness), 4),
+        accuracy      = round(min(1.0, completeness), 4),
+        sla_latency_ms= round(random.uniform(10, 80), 2),
+    )
+
+
+def _bug_count_df(df: pd.DataFrame, task_cfg: dict) -> int:
+    count = int(df.isnull().any(axis=None)) + int(df.duplicated().any())
+    for col, dtype in task_cfg.get("expected_schema", {}).items():
+        if col in df.columns and str(df[col].dtype) != dtype:
+            count += 1
+    for rule in task_cfg.get("business_rules", []):
+        if rule == "discount_lte_1" and "discount_pct" in df.columns:
+            count += int((pd.to_numeric(df["discount_pct"], errors="coerce") > 1).any())
+        elif rule == "fraud_score_lte_1" and "fraud_score" in df.columns:
+            count += int((pd.to_numeric(df["fraud_score"], errors="coerce") > 1).any())
+        elif rule == "currency_3char" and "currency" in df.columns:
+            count += int(df["currency"].dropna().str.len().ne(3).any())
+        elif rule == "country_2char" and "country_code" in df.columns:
+            count += int(df["country_code"].dropna().str.len().ne(2).any())
+    return count
+
+
+def _describe(action: str, params: dict, result: _ActionResult) -> str:
+    a = action
+    if a == "inspect":            return f"Inspected state. {result.message}"
+    if a == "cast_column":        return f'Cast "{params.get("column","?")}" → {params.get("dtype","?")}.'
+    if a == "drop_nulls":         return f'Dropped null rows in "{params.get("column","all")}".'
+    if a == "fill_nulls":         return f'Filled nulls in "{params.get("column","?")}" with {params.get("value","median")}.'
+    if a == "drop_duplicates":    return f"Removed duplicates. {result.message}"
+    if a == "filter_outliers":    return f'Filtered outliers in "{params.get("column","?")}". {result.message}'
+    if a == "rename_column":      return f'Renamed "{params.get("old_name","?")}" → "{params.get("new_name","?")}".'
+    if a == "reorder_stages":     return f'Stage order set to {params.get("order",[])}.'
+    if a == "apply_business_rule":return f'Rule "{params.get("rule","?")}": {result.message}'
+    if a == "validate":           return f"Validated. Score: {result.score:.4f}." if result.score else "Validated."
+    if a == "submit":             return f"Submitted. Final score: {result.score:.4f}." if result.score else "Submitted."
+    return f"{action}: {result.message}"
+
+
+def _make_observation(state: PipelineState, hint: str = "") -> Observation:
+    """Build a valid Observation from current PipelineState."""
+    return Observation(
+        task_id         = state.task_id,
+        step_count      = state.step_count,
+        max_steps       = state.max_steps,
+        pipeline_stage  = state.pipeline_stage,
+        data_sample     = state.data[:5],
+        schema_info     = state.schema_info,
+        error_log       = state.error_log[-10:],   # last 10 errors only
+        metrics         = state.metrics,
+        available_actions = [a.value for a in ActionType],
+        hint            = hint,
+        done            = state.done,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DataPipelineEnv
+# ─────────────────────────────────────────────────────────────────────────────
 
 class DataPipelineEnv:
     """
-    OpenEnv-compliant environment for Data Pipeline Debugging.
+    Core RL environment. Returns proper Observation objects on reset()/step().
 
-    Lifecycle:
-        env = DataPipelineEnv()
-        obs = env.reset(task_id="task_easy_schema_fix")
-        result = env.step(action)   # StepResult
-        state  = env.state()        # PipelineState
+    Public attributes
+    -----------------
+    state   : PipelineState | None
+    history : list[StepRecord]   — populated each step, cleared on reset()
     """
 
-    def __init__(self, seed: int = 42):
-        self._seed = seed
-        self._state: Optional[PipelineState] = None
+    STEP_COST      = -0.02
+    REPEAT_PENALTY = -0.05
+    SUBMIT_BONUS   =  0.10
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
+    def __init__(self, task_id: str, seed: int = 42):
+        self.task_id = task_id
+        self.seed    = seed
+        self.state:  PipelineState | None = None
+        self._df:    pd.DataFrame | None  = None
 
-    def reset(self, task_id: str = "task_easy_schema_fix", seed: int = None) -> Observation:
-        """Reset environment to initial state for the given task."""
-        if seed is not None:
-            self._seed = seed
-        builder = TASK_BUILDERS.get(task_id)
-        if builder is None:
-            raise ValueError(f"Unknown task_id: {task_id!r}. "
-                             f"Available: {list(TASK_BUILDERS.keys())}")
-        self._state = builder(seed=self._seed)
-        return self._make_observation()
+        self._cumulative_reward = 0.0
+        self._step_count        = 0
+        self._last_actions:     list[str]      = []
+        self.history:           list[StepRecord] = []
 
-    def step(self, action: Action) -> StepResult:
-        """Apply an action and return (observation, reward, done, info)."""
-        if self._state is None:
+    # ── lifecycle ─────────────────────────────────────────────────────────────
+
+    def reset(self) -> Observation:
+        from tasks.definitions import TASK_REGISTRY
+        if self.task_id not in TASK_REGISTRY:
+            raise KeyError(f"Unknown task '{self.task_id}'. "
+                           f"Available: {list(TASK_REGISTRY.keys())}")
+
+        self.state             = TASK_REGISTRY[self.task_id].build_state(seed=self.seed)
+        self._df               = pd.DataFrame(self.state.data)
+        self._cumulative_reward = 0.0
+        self._step_count        = 0
+        self._last_actions      = []
+        self.history            = []
+
+        return _make_observation(self.state, hint="Environment ready.")
+
+    def step(self, action: Action) -> Observation:
+        if self.state is None:
             raise RuntimeError("Call reset() before step().")
 
-        state = self._state
-        if state.done:
-            obs = self._make_observation()
-            return StepResult(
-                observation=obs,
-                reward=Reward(value=0.0, cumulative=state.cumulative_reward,
-                              explanation="Episode already done."),
-                done=True,
-                info={"warning": "Episode is already finished."},
+        self._step_count    += 1
+        self.state.step_count = self._step_count
+
+        # Support both .action_type (enum) and raw string
+        if hasattr(action, "action_type"):
+            raw_action = action.action_type
+            if hasattr(raw_action, "value"):
+                raw_action = raw_action.value
+        else:
+            raw_action = str(action)
+
+        # Build params dict from Action fields
+        params = {}
+        if hasattr(action, "params") and action.params:
+            params = action.params
+        else:
+            if getattr(action, "column", None):    params["column"]   = action.column
+            if getattr(action, "value", None):     params["value"]    = action.value
+            if getattr(action, "parameters", None): params.update(action.parameters or {})
+
+        # Repeat penalty
+        repeat = self._last_actions.count(raw_action) > 0
+        self._last_actions.append(raw_action)
+        if len(self._last_actions) > 5:
+            self._last_actions.pop(0)
+
+        # Dispatch
+        result = self._dispatch(raw_action, params)
+
+        # Compute final reward
+        reward = result.reward + self.STEP_COST
+        if repeat and raw_action not in ("validate", "submit"):
+            reward += self.REPEAT_PENALTY
+        self._cumulative_reward    += reward
+        self.state.cumulative_reward = self._cumulative_reward
+
+        # Sync df → state.data and recompute metrics
+        if self._df is not None:
+            self.state.data    = _df_to_data(self._df)
+            self.state.metrics = _recompute_metrics(self.state.data, self.state.schema_info)
+
+        # Terminal
+        done = result.done or self._step_count >= self.state.max_steps
+        self.state.done = done
+
+        # Bug count for history
+        task_cfg = self._get_task_cfg()
+        bugs = _bug_count_df(self._df, task_cfg) if self._df is not None else 0
+
+        # Append error lines to state
+        if result.error_lines:
+            self.state.error_log.extend(result.error_lines)
+
+        # StepRecord
+        desc = _describe(raw_action, params, result)
+        self.history.append(StepRecord(
+            step              = self._step_count,
+            action            = raw_action,
+            params            = params,
+            reward            = reward,
+            cumulative_reward = _clip(self._cumulative_reward),
+            bugs_remaining    = bugs,
+            description       = desc,
+        ))
+
+        return _make_observation(self.state, hint=result.message)
+
+    # ── dispatch ──────────────────────────────────────────────────────────────
+
+    def _dispatch(self, action: str, params: dict) -> _ActionResult:
+        df = self._df
+
+        # ── inspect ──
+        if action == ActionType.INSPECT.value:
+            nulls = int(df.isnull().sum().sum())
+            dups  = int(df.duplicated().sum())
+            msg   = f"Rows:{len(df)} Cols:{len(df.columns)} Nulls:{nulls} Dups:{dups}"
+            return _ActionResult(reward=0.0, message=msg)
+
+        # ── cast_column ──
+        if action == ActionType.CAST_COLUMN.value:
+            col   = params.get("column") or params.get("col")
+            dtype = params.get("dtype")  or params.get("type")
+            if not col or col not in df.columns:
+                return _ActionResult(reward=-0.01, message=f"Column '{col}' not found.")
+            try:
+                self._df[col] = df[col].astype(dtype)
+                return _ActionResult(reward=0.06, message=f"Cast '{col}'→{dtype}.")
+            except Exception as e:
+                return _ActionResult(reward=-0.01, message=str(e))
+
+        # ── drop_nulls ──
+        if action == ActionType.DROP_NULLS.value:
+            col    = params.get("column")
+            before = len(df)
+            self._df = df.dropna(subset=[col]) if col and col in df.columns else df.dropna()
+            dropped  = before - len(self._df)
+            return _ActionResult(
+                reward  = 0.06 if dropped else -0.01,
+                message = f"Dropped {dropped} null rows.",
             )
 
-        state.step_count += 1
-        info: Dict[str, Any] = {}
+        # ── fill_nulls ──
+        if action == ActionType.FILL_NULLS.value:
+            col   = params.get("column")
+            value = params.get("value", "median")
+            if not col or col not in df.columns:
+                return _ActionResult(reward=-0.01, message=f"Column '{col}' not found.")
+            num = pd.to_numeric(df[col], errors="coerce")
+            fill_val = num.median() if value == "median" else value
+            self._df[col] = df[col].fillna(fill_val)
+            return _ActionResult(reward=0.08, message=f"Filled nulls in '{col}' with {fill_val}.")
 
-        # Apply action
-        prev_score = grade(state)
-        action_result = self._apply_action(action, state)
-        info["action_result"] = action_result
-        new_score   = grade(state)
+        # ── drop_duplicates ──
+        if action == ActionType.DROP_DUPLICATES.value:
+            before   = len(df)
+            self._df = df.drop_duplicates()
+            dropped  = before - len(self._df)
+            return _ActionResult(
+                reward  = 0.08 if dropped else -0.01,
+                message = f"Removed {dropped} duplicates.",
+            )
 
-        # Reward computation
-        reward_val, components, explanation = self._compute_reward(
-            prev_score, new_score, action, state, action_result
-        )
-        state.cumulative_reward = round(state.cumulative_reward + reward_val, 4)
-        state.applied_actions.append(action.action_type)
+        # ── filter_outliers ──
+        if action == ActionType.FILTER_OUTLIERS.value:
+            col = params.get("column")
+            if not col or col not in df.columns:
+                return _ActionResult(reward=-0.01, message=f"Column '{col}' not found.")
+            num = pd.to_numeric(df[col], errors="coerce")
+            q1, q3   = num.quantile(0.25), num.quantile(0.75)
+            iqr      = q3 - q1
+            mask     = num.between(q1 - 1.5*iqr, q3 + 1.5*iqr) | num.isna()
+            before   = len(df)
+            self._df = df[mask]
+            removed  = before - len(self._df)
+            return _ActionResult(
+                reward  = 0.08 if removed else -0.01,
+                message = f"Removed {removed} outliers from '{col}'.",
+            )
 
-        # Episode termination checks
-        done = False
-        final_score = new_score
+        # ── rename_column ──
+        if action == ActionType.RENAME_COLUMN.value:
+            old = params.get("old_name") or params.get("old")
+            new = params.get("new_name") or params.get("new")
+            if not old or old not in df.columns:
+                return _ActionResult(reward=-0.01, message=f"Column '{old}' not found.")
+            self._df = df.rename(columns={old: new})
+            return _ActionResult(reward=0.06, message=f"Renamed '{old}'→'{new}'.")
 
-        if action.action_type == ActionType.SUBMIT:
-            done = True
-            final_score = grade(state)
-            info["final_score"] = final_score
-            info["bugs_fixed"]  = state.bugs_fixed
-            state.pipeline_stage = "complete"
-        elif state.step_count >= state.max_steps:
-            done = True
-            final_score = grade(state)
-            info["truncated"]   = True
-            info["final_score"] = final_score
+        # ── reorder_stages ──
+        if action == ActionType.REORDER_STAGES.value:
+            order = params.get("order", [])
+            self.state.stage_order = order
+            correct = ["ingest","validate","transform","enrich","load"]
+            reward  = 0.12 if order == correct else 0.02
+            return _ActionResult(reward=reward, message=f"Stage order set to {order}.")
 
-        state.done = done
+        # ── apply_business_rule ──
+        if action == ActionType.APPLY_BUSINESS_RULE.value:
+            rule = params.get("rule", "")
+            return self._apply_rule(rule)
 
-        reward = Reward(
-            value=round(reward_val, 4),
-            cumulative=state.cumulative_reward,
-            components=components,
-            explanation=explanation,
-        )
-        obs = self._make_observation()
-        return StepResult(observation=obs, reward=reward, done=done, info=info)
+        # ── validate ──
+        if action == ActionType.VALIDATE.value:
+            score = self._score_current()
+            return _ActionResult(reward=0.02, message=f"Score: {score:.4f}", score=score)
 
-    def state(self) -> PipelineState:
-        """Return full internal state (superset of observation)."""
-        if self._state is None:
-            raise RuntimeError("Call reset() first.")
-        return copy.deepcopy(self._state)
+        # ── submit ──
+        if action == ActionType.SUBMIT.value:
+            score = _clip(self._score_current())
+            return _ActionResult(
+                reward  = self.SUBMIT_BONUS * score,
+                message = f"Final score: {score:.4f}",
+                score   = score,
+                done    = True,
+            )
 
-    def tasks(self) -> List[Dict]:
-        return copy.deepcopy(TASK_INFO)
+        return _ActionResult(reward=-0.01, message=f"Unknown action: {action}")
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
+    # ── business rules ────────────────────────────────────────────────────────
 
-    def _make_observation(self) -> Observation:
-        s = self._state
-        sample = s.data[:5] if s.data else []
-        available = self._available_actions(s)
-        hint = self._get_hint(s)
-        return Observation(
-            task_id         = s.task_id,
-            step_count      = s.step_count,
-            max_steps       = s.max_steps,
-            pipeline_stage  = s.pipeline_stage,
-            data_sample     = sample,
-            schema_info     = s.schema_info,
-            error_log       = s.error_log[-6:],  # last 6 errors
-            metrics         = s.metrics,
-            available_actions= available,
-            hint            = hint,
-            done            = s.done,
-        )
+    def _apply_rule(self, rule: str) -> _ActionResult:
+        df = self._df
+        if rule == "discount_lte_1" and "discount_pct" in df.columns:
+            vals = pd.to_numeric(df["discount_pct"], errors="coerce")
+            n    = int((vals > 1).sum())
+            self._df["discount_pct"] = vals.clip(upper=1.0)
+            return _ActionResult(reward=0.10 if n else -0.01, message=f"Clipped {n} discount rows.")
 
-    def _available_actions(self, s: PipelineState) -> List[str]:
-        actions = ["inspect", "validate", "submit"]
-        actions += ["cast_column", "drop_nulls", "fill_nulls",
-                    "drop_duplicates", "filter_outliers",
-                    "rename_column", "apply_business_rule"]
-        if s.task_id == "task_hard_pipeline_orchestration":
-            actions.append("reorder_stages")
-        return actions
+        if rule == "fraud_score_lte_1" and "fraud_score" in df.columns:
+            vals = pd.to_numeric(df["fraud_score"], errors="coerce")
+            n    = int((vals > 1).sum())
+            self._df["fraud_score"] = vals.clip(upper=1.0)
+            return _ActionResult(reward=0.10 if n else -0.01, message=f"Clipped {n} fraud_score rows.")
 
-    def _get_hint(self, s: PipelineState) -> str:
-        unfixed = [k for k, v in s.bugs_fixed.items() if not v]
-        if not unfixed:
-            return "All tracked issues resolved. Consider calling submit."
-        # Give a gentle hint toward the first unfixed bug
-        hint_map = {
-            "cast_customer_id_to_int":   "Try cast_column on 'customer_id' → 'int'",
-            "cast_age_to_int":           "Try cast_column on 'age' → 'int'",
-            "cast_revenue_to_float":     "Try cast_column on 'revenue' → 'float'",
-            "handle_bad_age":            "Some age values are non-numeric strings — use filter_outliers or fill_nulls",
-            "handle_bad_revenue":        "Some revenue='N/A' — use fill_nulls or filter_outliers",
-            "drop_duplicates":           "Duplicate rows detected — use drop_duplicates",
-            "fill_or_drop_nulls":        "Null values remain — use fill_nulls or drop_nulls",
-            "filter_negative_qty":       "Negative quantity detected — use filter_outliers on 'quantity'",
-            "filter_outlier_qty":        "Extreme quantity values detected — use filter_outliers",
-            "fix_invalid_discount":      "discount > 1.0 is invalid — use apply_business_rule",
-            "fix_negative_price":        "Negative unit_price — use filter_outliers on 'unit_price'",
-            "fix_stage_order":           "Pipeline stages are in the wrong order — use reorder_stages",
-            "cast_txn_id_to_int":        "txn_id should be int — use cast_column",
-            "cast_user_id_to_int":       "user_id should be int — use cast_column",
-            "cast_amount_to_float":      "amount should be float — use cast_column",
-            "cast_fraud_score_to_float": "fraud_score should be float — use cast_column",
-            "fill_nulls_merchant":       "Null merchants found — use fill_nulls",
-            "fill_nulls_fraud_score":    "Null fraud_score found — use fill_nulls",
-            "filter_negative_amounts":   "Negative amounts violate business rules",
-            "fix_invalid_fraud_scores":  "fraud_score > 1.0 is invalid",
-            "fix_currency_codes":        "Currency codes must be exactly 3 characters",
-            "fix_country_codes":         "Country codes must be exactly 2 characters",
-            "validate_final":            "Run validate to confirm all fixes, then submit",
-        }
-        return hint_map.get(unfixed[0], f"Fix remaining issue: {unfixed[0]}")
+        if rule == "currency_3char" and "currency" in df.columns:
+            mask = df["currency"].dropna().str.len().ne(3)
+            n    = int(mask.sum())
+            self._df.loc[df["currency"].notna() & df["currency"].str.len().ne(3), "currency"] = \
+                df.loc[df["currency"].notna() & df["currency"].str.len().ne(3), "currency"].str[:3].str.upper()
+            return _ActionResult(reward=0.10 if n else -0.01, message=f"Fixed {n} currency codes.")
 
-    # ------------------------------------------------------------------
-    # Action application
-    # ------------------------------------------------------------------
+        if rule == "country_2char" and "country_code" in df.columns:
+            mask = df["country_code"].dropna().str.len().ne(2)
+            n    = int(mask.sum())
+            self._df.loc[df["country_code"].notna() & df["country_code"].str.len().ne(2), "country_code"] = \
+                df.loc[df["country_code"].notna() & df["country_code"].str.len().ne(2), "country_code"].str[:2].str.upper()
+            return _ActionResult(reward=0.10 if n else -0.01, message=f"Fixed {n} country codes.")
 
-    def _apply_action(self, action: Action, state: PipelineState) -> str:
-        at = action.action_type
+        return _ActionResult(reward=-0.01, message=f"Rule '{rule}' had no effect.")
 
-        if at == ActionType.INSPECT:
-            return self._action_inspect(state)
-        elif at == ActionType.CAST_COLUMN:
-            return self._action_cast(action, state)
-        elif at == ActionType.DROP_NULLS:
-            return self._action_drop_nulls(action, state)
-        elif at == ActionType.FILL_NULLS:
-            return self._action_fill_nulls(action, state)
-        elif at == ActionType.DROP_DUPLICATES:
-            return self._action_drop_duplicates(state)
-        elif at == ActionType.FILTER_OUTLIERS:
-            return self._action_filter_outliers(action, state)
-        elif at == ActionType.RENAME_COLUMN:
-            return self._action_rename_column(action, state)
-        elif at == ActionType.REORDER_STAGES:
-            return self._action_reorder_stages(action, state)
-        elif at == ActionType.APPLY_BUSINESS_RULE:
-            return self._action_apply_business_rule(action, state)
-        elif at == ActionType.VALIDATE:
-            return self._action_validate(state)
-        elif at == ActionType.SUBMIT:
-            return "Episode submitted for final grading."
-        return f"Unknown action: {at}"
+    # ── scoring ───────────────────────────────────────────────────────────────
 
-    # ---- Individual action implementations ----
+    def _score_current(self) -> float:
+        from graders.graders import score_pipeline
+        if self._df is not None:
+            self.state.data    = _df_to_data(self._df)
+            self.state.metrics = _recompute_metrics(self.state.data, self.state.schema_info)
+        return score_pipeline(self.state, self.task_id)
 
-    def _action_inspect(self, state: PipelineState) -> str:
-        n_null = sum(1 for row in state.data
-                     for v in row.values() if v is None or v == "")
-        n_dup  = len(state.data) - len({tuple(sorted(r.items())) for r in state.data})
-        return (f"Inspection: {len(state.data)} rows, "
-                f"{n_null} null cells, "
-                f"{n_dup} duplicate rows, "
-                f"stage_order={state.stage_order}")
-
-    def _action_cast(self, action: Action, state: PipelineState) -> str:
-        col      = action.column
-        to_type  = (action.value or "").lower()
-        if not col or not to_type:
-            return "cast_column requires 'column' and 'value' (target type)."
-
-        converters = {
-            "int":   lambda x: int(float(x)) if x not in (None, "") else None,
-            "float": lambda x: float(x) if x not in (None, "") else None,
-            "str":   lambda x: str(x) if x is not None else None,
-            "bool":  lambda x: str(x).lower() in ("true","1","yes") if x not in (None,"") else None,
-        }
-        conv = converters.get(to_type)
-        if conv is None:
-            return f"Unsupported target type: {to_type!r}"
-
-        converted = failed = 0
-        for row in state.data:
-            if col in row:
-                try:
-                    row[col] = conv(row[col])
-                    converted += 1
-                except (ValueError, TypeError):
-                    row[col] = None   # coerce failures to null
-                    failed += 1
-
-        # Update schema actual_type
-        for sf in state.schema_info:
-            if sf.name == col:
-                sf.actual_type = to_type
-                break
-
-        # Mark bugs fixed
-        task  = state.task_id
-        key_map = {
-            ("task_easy_schema_fix",           "customer_id", "int"):   "cast_customer_id_to_int",
-            ("task_easy_schema_fix",           "age",         "int"):   "cast_age_to_int",
-            ("task_easy_schema_fix",           "revenue",     "float"): "cast_revenue_to_float",
-            ("task_hard_pipeline_orchestration","txn_id",      "int"):   "cast_txn_id_to_int",
-            ("task_hard_pipeline_orchestration","user_id",     "int"):   "cast_user_id_to_int",
-            ("task_hard_pipeline_orchestration","amount",      "float"): "cast_amount_to_float",
-            ("task_hard_pipeline_orchestration","fraud_score", "float"): "cast_fraud_score_to_float",
-        }
-        bug_key = key_map.get((task, col, to_type))
-        if bug_key and bug_key in state.bugs_fixed:
-            state.bugs_fixed[bug_key] = True
-
-        self._refresh_metrics(state)
-        state.error_log.append(f"cast_column: {col}→{to_type}: {converted} ok, {failed} failed→null")
-        return f"Cast '{col}' to {to_type}: {converted} converted, {failed} coerced to null."
-
-    def _action_drop_nulls(self, action: Action, state: PipelineState) -> str:
-        col = action.column  # None = drop any row with any null
-        before = len(state.data)
-        if col:
-            state.data = [r for r in state.data if r.get(col) not in (None, "")]
-        else:
-            cols = [sf.name for sf in state.schema_info if not sf.nullable]
-            state.data = [
-                r for r in state.data
-                if all(r.get(c) not in (None, "") for c in cols)
-            ]
-        removed = before - len(state.data)
-        # Mark bug fixed if relevant
-        if state.task_id == "task_medium_data_quality":
-            state.bugs_fixed["fill_or_drop_nulls"] = True
-        self._refresh_metrics(state)
-        state.error_log.append(f"drop_nulls on {col or 'required cols'}: removed {removed} rows")
-        return f"Dropped {removed} null rows (col={col or 'all required'})."
-
-    def _action_fill_nulls(self, action: Action, state: PipelineState) -> str:
-        col   = action.column
-        value = action.value
-        if not col:
-            return "fill_nulls requires 'column'."
-        filled = 0
-        for row in state.data:
-            if row.get(col) in (None, ""):
-                row[col] = value if value is not None else "UNKNOWN"
-                filled += 1
-
-        # Bug tracking
-        task = state.task_id
-        if task == "task_medium_data_quality":
-            state.bugs_fixed["fill_or_drop_nulls"] = True
-        elif task == "task_hard_pipeline_orchestration":
-            if col == "merchant":
-                state.bugs_fixed["fill_nulls_merchant"] = True
-            elif col == "fraud_score":
-                state.bugs_fixed["fill_nulls_fraud_score"] = True
-        elif task == "task_easy_schema_fix" and col in ("age","revenue"):
-            # Filling bad values counts as handling them
-            state.bugs_fixed[f"handle_bad_{col}"] = True
-
-        self._refresh_metrics(state)
-        state.error_log.append(f"fill_nulls: {col} filled {filled} nulls with {value!r}")
-        return f"Filled {filled} nulls in '{col}' with {value!r}."
-
-    def _action_drop_duplicates(self, state: PipelineState) -> str:
-        before = len(state.data)
-        seen   = set()
-        deduped= []
-        for row in state.data:
-            key = tuple(sorted((k, str(v)) for k, v in row.items()))
-            if key not in seen:
-                seen.add(key)
-                deduped.append(row)
-        state.data = deduped
-        removed = before - len(state.data)
-        if state.task_id in ("task_medium_data_quality","task_hard_pipeline_orchestration"):
-            state.bugs_fixed["drop_duplicates"] = True
-        self._refresh_metrics(state)
-        state.error_log.append(f"drop_duplicates: removed {removed} exact duplicates")
-        return f"Removed {removed} duplicate rows."
-
-    def _action_filter_outliers(self, action: Action, state: PipelineState) -> str:
-        col   = action.column
-        params= action.parameters or {}
-        if not col:
-            return "filter_outliers requires 'column'."
-
-        # Parse min/max from parameters or infer from value
-        min_val = params.get("min")
-        max_val = params.get("max")
-        if min_val is None and max_val is None and action.value:
-            parts = action.value.split(",")
-            min_val = float(parts[0]) if len(parts) > 0 and parts[0].strip() else None
-            max_val = float(parts[1]) if len(parts) > 1 and parts[1].strip() else None
-
-        before = len(state.data)
-        def keep(row):
-            v = row.get(col)
-            if v is None:
-                return True
-            try:
-                v = float(v)
-                if min_val is not None and v < min_val:
-                    return False
-                if max_val is not None and v > max_val:
-                    return False
-                return True
-            except (ValueError, TypeError):
-                return False  # non-numeric → remove
-
-        state.data = [r for r in state.data if keep(r)]
-        removed = before - len(state.data)
-
-        # Bug tracking
-        task = state.task_id
-        if task == "task_easy_schema_fix" and col == "age":
-            state.bugs_fixed["handle_bad_age"] = True
-        elif task == "task_easy_schema_fix" and col == "revenue":
-            state.bugs_fixed["handle_bad_revenue"] = True
-        elif task == "task_medium_data_quality":
-            if col == "quantity" and min_val is not None and min_val >= 0:
-                state.bugs_fixed["filter_negative_qty"] = True
-            if col == "quantity" and max_val is not None and max_val <= 1000:
-                state.bugs_fixed["filter_outlier_qty"] = True
-            if col == "unit_price" and min_val is not None and min_val >= 0:
-                state.bugs_fixed["fix_negative_price"] = True
-        elif task == "task_hard_pipeline_orchestration":
-            if col == "amount" and min_val is not None and min_val >= 0:
-                state.bugs_fixed["filter_negative_amounts"] = True
-
-        self._refresh_metrics(state)
-        state.error_log.append(f"filter_outliers: {col} [{min_val},{max_val}] removed {removed}")
-        return f"Filtered outliers in '{col}': removed {removed} rows."
-
-    def _action_rename_column(self, action: Action, state: PipelineState) -> str:
-        col     = action.column
-        new_name= action.value
-        if not col or not new_name:
-            return "rename_column requires 'column' (old name) and 'value' (new name)."
-        for row in state.data:
-            if col in row:
-                row[new_name] = row.pop(col)
-        for sf in state.schema_info:
-            if sf.name == col:
-                sf.name = new_name
-                break
-        self._refresh_metrics(state)
-        return f"Renamed column '{col}' → '{new_name}'."
-
-    def _action_reorder_stages(self, action: Action, state: PipelineState) -> str:
-        """Agent provides new stage order via parameters.stages or value."""
-        if state.task_id != "task_hard_pipeline_orchestration":
-            return "reorder_stages only applies to the hard task."
-        params = action.parameters or {}
-        stages = params.get("stages")
-        if stages is None and action.value:
-            stages = [s.strip() for s in action.value.split(",")]
-        if stages is None:
-            stages = HARD_STAGE_ORDER_CORRECT  # default to correct
-
-        state.stage_order = list(stages)
-        if state.stage_order == HARD_STAGE_ORDER_CORRECT:
-            state.bugs_fixed["fix_stage_order"] = True
-            state.error_log.append("reorder_stages: stage order corrected ✓")
-            return "Stage order corrected to: " + " → ".join(stages)
-        else:
-            state.error_log.append(f"reorder_stages: still wrong: {stages}")
-            return f"Stage order set to {stages} — this is NOT the correct order."
-
-    def _action_apply_business_rule(self, action: Action, state: PipelineState) -> str:
-        """Apply a named business rule to filter/fix rows."""
-        rule_name = action.value or (action.parameters or {}).get("rule", "")
-        col       = action.column
-        task      = state.task_id
-        before    = len(state.data)
-
-        if rule_name == "discount_lte_1" or (col == "discount"):
-            state.data = [r for r in state.data
-                          if r.get("discount") is None or
-                          (isinstance(r.get("discount"),(int,float)) and r["discount"] <= 1.0)]
-            if task == "task_medium_data_quality":
-                state.bugs_fixed["fix_invalid_discount"] = True
-
-        elif rule_name == "fraud_score_lte_1" or col == "fraud_score":
-            state.data = [r for r in state.data
-                          if r.get("fraud_score") is None or
-                          (isinstance(r.get("fraud_score"),(int,float)) and r["fraud_score"] <= 1.0)]
-            if task == "task_hard_pipeline_orchestration":
-                state.bugs_fixed["fix_invalid_fraud_scores"] = True
-
-        elif rule_name == "currency_3char" or col == "currency":
-            def fix_currency(row):
-                c = row.get("currency","")
-                if isinstance(c, str) and len(c) != 3:
-                    row["currency"] = None  # nullify invalid
-                return row
-            state.data = [fix_currency(r) for r in state.data]
-            if task == "task_hard_pipeline_orchestration":
-                state.bugs_fixed["fix_currency_codes"] = True
-
-        elif rule_name == "country_2char" or col == "country_code":
-            def fix_country(row):
-                c = row.get("country_code","")
-                if isinstance(c, str) and len(c) != 2:
-                    row["country_code"] = None
-                return row
-            state.data = [fix_country(r) for r in state.data]
-            if task == "task_hard_pipeline_orchestration":
-                state.bugs_fixed["fix_country_codes"] = True
-
-        else:
-            return f"Unknown business rule: {rule_name!r}. Known: discount_lte_1, fraud_score_lte_1, currency_3char, country_2char"
-
-        removed = before - len(state.data)
-        self._refresh_metrics(state)
-        state.error_log.append(f"apply_business_rule '{rule_name}': {removed} rows affected")
-        return f"Applied rule '{rule_name}': {removed} rows affected."
-
-    def _action_validate(self, state: PipelineState) -> str:
-        self._refresh_metrics(state)
-        m = state.metrics
-        issues = []
-        for sf in state.schema_info:
-            if sf.actual_type != sf.expected_type:
-                issues.append(f"  • '{sf.name}': expected {sf.expected_type}, got {sf.actual_type}")
-        if state.task_id == "task_hard_pipeline_orchestration":
-            if state.stage_order != HARD_STAGE_ORDER_CORRECT:
-                issues.append(f"  • Stage order WRONG: {state.stage_order}")
-            if state.bugs_fixed.get("fix_invalid_fraud_scores") is False:
-                issues.append("  • fraud_score > 1.0 still present")
-        if state.task_id == "task_hard_pipeline_orchestration":
-            state.bugs_fixed["validate_final"] = len(issues) == 0
-
-        summary = (f"Validation: completeness={m.completeness:.3f} "
-                   f"uniqueness={m.uniqueness:.3f} "
-                   f"validity={m.validity:.3f} "
-                   f"accuracy={m.accuracy:.3f}")
-        if issues:
-            state.error_log.append("validate: issues found")
-            return summary + "\nIssues:\n" + "\n".join(issues)
-        state.error_log.append("validate: PASSED ✓")
-        return summary + "\nAll schema checks PASSED ✓"
-
-    # ------------------------------------------------------------------
-    # Reward computation
-    # ------------------------------------------------------------------
-
-    def _compute_reward(
-        self,
-        prev_score: float,
-        new_score:  float,
-        action:     Action,
-        state:      PipelineState,
-        action_result: str,
-    ) -> Tuple[float, Dict[str, float], str]:
-        """
-        Multi-component reward:
-          progress   = new_score - prev_score  (can be negative)
-          efficiency = -0.01 per step (small step cost encourages concision)
-          repeat_pen = -0.05 if same action used 3+ times consecutively
-          submit_bon =  0.1 * new_score on submit (quality bonus)
-        """
-        progress   = new_score - prev_score
-        step_cost  = -0.02
-
-        # Penalize repeating the same action many times
-        recent = state.applied_actions[-3:] if state.applied_actions else []
-        repeat_pen = -0.05 if len(recent) == 3 and len(set(recent)) == 1 else 0.0
-
-        submit_bon = 0.0
-        if action.action_type == ActionType.SUBMIT:
-            submit_bon = 0.1 * new_score
-
-        total = progress + step_cost + repeat_pen + submit_bon
-
-        components = {
-            "progress":   round(progress,   4),
-            "step_cost":  step_cost,
-            "repeat_pen": repeat_pen,
-            "submit_bon": round(submit_bon, 4),
-        }
-        explanation = (
-            f"progress={progress:+.4f}, step_cost={step_cost}, "
-            f"repeat_pen={repeat_pen}, submit_bonus={submit_bon:.4f} → total={total:.4f}"
-        )
-        return round(total, 4), components, explanation
-
-    # ------------------------------------------------------------------
-    # Metrics refresh
-    # ------------------------------------------------------------------
-
-    def _refresh_metrics(self, state: PipelineState):
-        task = state.task_id
-        if task == "task_easy_schema_fix":
-            rules = None
-        elif task == "task_medium_data_quality":
-            rules = MEDIUM_RULES
-        elif task == "task_hard_pipeline_orchestration":
-            rules = HARD_RULES
-        else:
-            # very_hard and expert tasks
-            rules = EXTRA_RULES.get(task, HARD_RULES)
-        state.metrics = _compute_metrics(state.data, state.schema_info, rules)
-        # SLA latency increases with unfixed bugs for hard/veryhard/expert tasks
-        if task in ("task_hard_pipeline_orchestration",
-                    "task_veryhard_streaming_pipeline",
-                    "task_expert_multi_source_join"):
-            unfixed = sum(1 for v in state.bugs_fixed.values() if not v)
-            base_latency = {
-                "task_hard_pipeline_orchestration":  30,
-                "task_veryhard_streaming_pipeline":   50,
-                "task_expert_multi_source_join":       40,
-            }.get(task, 30)
-            state.metrics.sla_latency_ms = round(base_latency + unfixed * 20.0, 2)
+    def _get_task_cfg(self) -> dict:
+        try:
+            from tasks.definitions import TASK_REGISTRY
+            return TASK_REGISTRY[self.task_id].config
+        except Exception:
+            return {}
