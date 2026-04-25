@@ -1,6 +1,9 @@
 """
 OpenEnv Data Pipeline Debugger — FastAPI Application
 Exposes reset(), step(), state() as REST endpoints.
+
+Fix applied: DataPipelineEnv now requires task_id as first arg.
+_env is now a stateful session manager that tracks current task_id + seed.
 """
 
 from __future__ import annotations
@@ -14,6 +17,7 @@ from pydantic import BaseModel
 
 from env.environment import DataPipelineEnv
 from env.models import Action, ActionType
+from tasks.definitions import TASK_INFO, TASK_REGISTRY
 
 
 # ---------------------------------------------------------------------------
@@ -38,8 +42,44 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Single global environment instance (stateful per session)
-_env = DataPipelineEnv(seed=42)
+# ---------------------------------------------------------------------------
+# Session state
+# FIX: DataPipelineEnv requires task_id — use a lazy wrapper instead of
+#      instantiating at module load time with no task_id.
+# ---------------------------------------------------------------------------
+
+class _EnvSession:
+    """
+    Thin stateful wrapper around DataPipelineEnv.
+    Holds the current task_id + seed so reset() can recreate the env
+    without needing task_id passed to __init__.
+    """
+    def __init__(self):
+        self._task_id = "task_easy_schema_fix"
+        self._seed    = 42
+        self._env: Optional[DataPipelineEnv] = None
+
+    def reset(self, task_id: str, seed: int) -> Any:
+        self._task_id = task_id
+        self._seed    = seed
+        self._env     = DataPipelineEnv(task_id=task_id, seed=seed)
+        return self._env.reset()
+
+    def step(self, action: Action) -> Any:
+        if self._env is None:
+            raise RuntimeError("Call /reset before /step.")
+        return self._env.step(action)
+
+    def state(self) -> Any:
+        if self._env is None:
+            raise RuntimeError("Call /reset before /state.")
+        return self._env.state
+
+    def tasks(self) -> list:
+        return TASK_INFO
+
+
+_session = _EnvSession()
 
 
 # ---------------------------------------------------------------------------
@@ -51,14 +91,13 @@ class ResetRequest(BaseModel):
     seed:    Optional[int] = 42
 
     class Config:
-        # Allow empty body {} or no body at all
         extra = "allow"
 
 
 class StepRequest(BaseModel):
     action_type: str
-    column:      Optional[str]         = None
-    value:       Optional[str]         = None
+    column:      Optional[str]            = None
+    value:       Optional[str]            = None
     parameters:  Optional[Dict[str, Any]] = None
 
 
@@ -74,21 +113,30 @@ def health():
 @app.get("/tasks")
 def list_tasks():
     """List all available tasks with metadata."""
-    return {"tasks": _env.tasks()}
+    return {"tasks": _session.tasks()}
 
 
 @app.post("/reset")
 def reset(req: Optional[ResetRequest] = None):
-    """Reset the environment for a given task. Returns initial Observation.
+    """
+    Reset the environment for a given task. Returns initial Observation.
     Accepts empty body {}, no body, or {task_id, seed}.
     """
+    task_id = (req.task_id if req and req.task_id else None) or "task_easy_schema_fix"
+    seed    = (req.seed    if req and req.seed is not None else None)
+    seed    = seed if seed is not None else 42
+
+    if task_id not in TASK_REGISTRY:
+        valid = list(TASK_REGISTRY.keys())
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown task_id {task_id!r}. Valid: {valid}",
+        )
+
     try:
-        task_id = (req.task_id if req and req.task_id else None) or "task_easy_schema_fix"
-        seed    = (req.seed    if req and req.seed    is not None else None)
-        seed    = seed if seed is not None else 42
-        obs = _env.reset(task_id=task_id, seed=seed)
+        obs = _session.reset(task_id=task_id, seed=seed)
         return obs.dict()
-    except ValueError as e:
+    except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -106,24 +154,43 @@ def step(req: StepRequest):
             status_code=400,
             detail=f"Invalid action_type {req.action_type!r}. Valid: {valid}",
         )
+
     action = Action(
         action_type=action_type,
         column=req.column,
         value=req.value,
         parameters=req.parameters,
     )
+
     try:
-        result = _env.step(action)
-        return result.dict()
+        obs = _session.step(action)
+        # Wrap in StepResult shape for backward compatibility with inference.py
+        return {
+            "observation": obs.dict(),
+            "reward": {
+                "value":       0.0,   # granular reward in history
+                "cumulative":  _session._env._cumulative_reward if _session._env else 0.0,
+                "components":  {},
+                "explanation": obs.hint,
+            },
+            "done": obs.done,
+            "info": {
+                "hint":         obs.hint,
+                "step_count":   obs.step_count,
+                "action_result": obs.hint,
+            },
+        }
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get("/state")
 def state():
-    """Return full internal state (superset of observation)."""
+    """Return full internal PipelineState."""
     try:
-        s = _env.state()
+        s = _session.state()
+        if s is None:
+            raise HTTPException(status_code=400, detail="Call /reset first.")
         return s.dict()
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -131,6 +198,7 @@ def state():
 
 @app.get("/")
 def root():
+    task_ids = [t["task_id"] for t in _session.tasks()]
     return {
         "name":        "OpenEnv — Data Pipeline Debugger",
         "version":     "1.0.0",
@@ -143,7 +211,7 @@ def root():
             "GET  /state":   "Get full internal state",
             "GET  /docs":    "Interactive API docs (Swagger)",
         },
-        "tasks": [t["task_id"] for t in _env.tasks()],
+        "tasks": task_ids,
     }
 
 
