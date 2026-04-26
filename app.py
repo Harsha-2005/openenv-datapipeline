@@ -7,17 +7,14 @@ _env is now a stateful session manager that tracks current task_id + seed.
 """
 
 from __future__ import annotations
-<<<<<<< HEAD
 import os
 from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, HTTPException
-=======
 import asyncio, json, os, io, csv, time
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from pydantic import BaseModel
@@ -203,15 +200,12 @@ def step(req: StepRequest):
     try:
         obs = _session.step(action)
         last_reward = 0.0
-<<<<<<< HEAD
         if _session._env and _session._env.history:
             last_reward = _session._env.history[-1].reward
-=======
         last_rec = None
         if _session._env and _session._env.history:
             last_rec = _session._env.history[-1]
             last_reward = last_rec.reward
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
 
         # Wrap in StepResult shape for backward compatibility with inference.py
         payload = {
@@ -219,11 +213,8 @@ def step(req: StepRequest):
             "reward": {
                 "value":       last_reward,
                 "cumulative":  _session._env._cumulative_reward if _session._env else 0.0,
-<<<<<<< HEAD
                 "components":  {},
-=======
                 "components":  last_rec.reward_components if last_rec else {},
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
                 "explanation": obs.hint,
             },
             "done": obs.done,
@@ -232,8 +223,6 @@ def step(req: StepRequest):
                 "step_count":   obs.step_count,
                 "action_result": obs.hint,
             },
-<<<<<<< HEAD
-=======
             # Explainability fields
             "explainability": {
                 "reasoning":          last_rec.reasoning if last_rec else "",
@@ -241,7 +230,6 @@ def step(req: StepRequest):
                 "reward_components":  last_rec.reward_components if last_rec else {},
                 "alternatives":       last_rec.alternatives if last_rec else [],
             } if last_rec else None,
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
         }
         return _sanitize_for_json(payload)
     except RuntimeError as e:
