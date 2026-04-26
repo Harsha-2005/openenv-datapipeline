@@ -16,6 +16,18 @@ import json, os, re, sys, time, traceback
 from typing import Any, Dict, List, Optional
 
 # ---------------------------------------------------------------------------
+<<<<<<< HEAD
+=======
+# Load .env file (for local runs — on HF Space env vars are set via secrets)
+# ---------------------------------------------------------------------------
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv not required — env vars may be set externally
+
+# ---------------------------------------------------------------------------
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
 # Configuration — read from environment variables
 # ---------------------------------------------------------------------------
 API_BASE_URL = os.environ.get("API_BASE_URL", "")
@@ -63,6 +75,35 @@ def env_step(action_type: str, column=None, value=None, parameters=None) -> Dict
 # LLM client — initialised after config check
 # ---------------------------------------------------------------------------
 client = None
+
+# ── Few-shot self-improvement memory (Change 2) ──────────────────────────────
+# Stores best episode action sequences for injection into system prompt.
+# When score >= 0.95, we save the action sequence here.
+_fewshot_examples: list[dict] = []   # [{"task_id": ..., "score": ..., "actions": [...]}]
+MAX_FEWSHOT_EXAMPLES = 3             # keep top 3 best runs
+
+def record_best_episode(task_id: str, score: float, actions: list[dict]):
+    """Save a high-scoring episode's action sequence for few-shot prompting."""
+    global _fewshot_examples
+    entry = {"task_id": task_id, "score": score, "actions": actions[:20]}  # cap at 20 actions
+    _fewshot_examples.append(entry)
+    _fewshot_examples.sort(key=lambda x: x["score"], reverse=True)
+    _fewshot_examples = _fewshot_examples[:MAX_FEWSHOT_EXAMPLES]
+    print(f"  [fewshot] Recorded best episode: task={task_id} score={score:.4f} "
+          f"({len(actions)} actions). Memory: {len(_fewshot_examples)} examples.")
+
+def _build_fewshot_block() -> str:
+    """Build a few-shot examples block for the system prompt."""
+    if not _fewshot_examples:
+        return ""
+    lines = ["\n\nFEW-SHOT EXAMPLES (high-scoring past runs — follow these patterns):"]
+    for i, ex in enumerate(_fewshot_examples):
+        actions_str = " → ".join(
+            a.get("action_type", "?") + (f"({a.get('column','')})" if a.get('column') else "")
+            for a in ex["actions"]
+        )
+        lines.append(f"  Example {i+1} (task={ex['task_id']}, score={ex['score']:.2f}): {actions_str}")
+    return "\n".join(lines)
 
 SYSTEM_PROMPT = """\
 You are a data pipeline debugger. Output ONLY a single JSON object — no explanation, \
@@ -211,6 +252,11 @@ def llm_choose_action(obs: Dict, history: List[Dict],
     )
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    # Inject few-shot examples if available (Change 2: Self-improvement)
+    fewshot_block = _build_fewshot_block()
+    enriched_prompt = SYSTEM_PROMPT + fewshot_block
+
+    messages = [{"role": "system", "content": enriched_prompt}]
     messages += history[-6:]
     messages.append({"role": "user", "content": user_msg})
 
@@ -219,6 +265,10 @@ def llm_choose_action(obs: Dict, history: List[Dict],
         if client:
             resp = client.chat.completions.create(
                 model=MODEL_NAME, messages=messages, max_tokens=200, temperature=0.0)
+            # Use temperature=0.5 for training exploration, 0.0 for evaluation
+            temp = 0.5 if _fewshot_examples or len(history) > 0 else 0.0
+            resp = client.chat.completions.create(
+                model=MODEL_NAME, messages=messages, max_tokens=200, temperature=temp)
             raw = resp.choices[0].message.content.strip()
     except Exception as e:
         print(f"[WARNING] LLM call failed: {e}", file=sys.stderr)
@@ -364,6 +414,23 @@ def _grade_from_obs(obs: Dict) -> float:
 # ---------------------------------------------------------------------------
 # run_agent_episode — local episode runner used by train.py
 # ---------------------------------------------------------------------------
+def _init_training_llm_client(base_url: str, model_name: str, hf_token: str):
+    """Lazily initialise an OpenAI-compatible client for training episodes."""
+    global client
+    if client is not None:
+        return client
+    if not base_url or not hf_token:
+        return None
+    try:
+        from openai import OpenAI
+        client = OpenAI(base_url=base_url, api_key=hf_token)
+        print(f"[train-llm] Client initialised: {model_name}", file=sys.stderr)
+        return client
+    except Exception as e:
+        print(f"[train-llm] Client init failed: {e}", file=sys.stderr)
+        return None
+
+
 def run_agent_episode(
     env,
     task_id: str,
@@ -377,6 +444,12 @@ def run_agent_episode(
     Run one episode using a local DataPipelineEnv instance.
     Used by train.py for curriculum training.
 
+    **Change 1**: Now calls llm_choose_action() at temperature=0.5 instead of
+    random noise, falling back to rule-based when LLM is unavailable.
+
+    **Change 2**: Records high-scoring episodes (score >= 0.95) as few-shot
+    examples for self-improvement.
+
     Parameters
     ----------
     env : DataPipelineEnv  — already reset()'d environment
@@ -384,6 +457,7 @@ def run_agent_episode(
     noise : float          — exploration noise (0=greedy, 1=random)
     episode : int          — episode number for logging
     base_url, model_name, hf_token — LLM config (unused in fallback mode)
+    base_url, model_name, hf_token — LLM config for llm_choose_action()
 
     Returns
     -------
@@ -391,6 +465,10 @@ def run_agent_episode(
     """
     import random as _rng
     from env.models import Action, ActionType
+
+    # ── Change 1: Try to initialise LLM client for training ──
+    _init_training_llm_client(base_url, model_name, hf_token)
+    llm_available = client is not None
 
     obs_obj = env.reset()
     obs = obs_obj.model_dump() if hasattr(obs_obj, "model_dump") else obs_obj
@@ -404,6 +482,18 @@ def run_agent_episode(
     while not done and step_count < max_steps:
         # With probability `noise`, pick a random action; otherwise use rule-based
         if _rng.random() < noise:
+    history: List[Dict] = []
+    episode_actions: list[dict] = []   # for few-shot recording
+    score = 0.0
+
+    while not done and step_count < max_steps:
+        # ── Change 1: Use LLM instead of random noise ──
+        if llm_available and _rng.random() >= noise:
+            # Call the real LLM with temperature=0.5 for exploration
+            action_dict, raw, used_fallback = llm_choose_action(
+                obs, history, inspect_count, last_actions)
+        elif _rng.random() < noise and noise > 0.3:
+            # High noise → small random exploration for diversity
             action_dict = _rng.choice([
                 {"action_type": "inspect"},
                 {"action_type": "drop_duplicates"},
@@ -411,6 +501,13 @@ def run_agent_episode(
             ])
         else:
             action_dict = _rule_based_fallback(obs, inspect_count, last_actions)
+            raw = json.dumps(action_dict)
+            used_fallback = True
+        else:
+            # No LLM available or low noise → deterministic rule-based
+            action_dict = _rule_based_fallback(obs, inspect_count, last_actions)
+            raw = json.dumps(action_dict)
+            used_fallback = True
 
         at = action_dict.get("action_type", "inspect")
         col = action_dict.get("column")
@@ -427,6 +524,12 @@ def run_agent_episode(
         elif at == "apply_business_rule" and val: last_actions.append(f"rule:{val[:10]}")
         else:                                    last_actions.append(at)
 
+        # Record for few-shot memory
+        episode_actions.append(action_dict)
+
+        # Build conversation history for LLM context
+        history.append({"role": "assistant", "content": raw if 'raw' in dir() else json.dumps(action_dict)})
+
         # Build Action object for local env
         try:
             action = Action(
@@ -442,6 +545,16 @@ def run_agent_episode(
         except Exception as e:
             print(f"  [ep {episode}] step error: {e}", file=sys.stderr)
             step_count += 1
+
+            # Add env response to history for LLM context
+            history.append({"role": "user", "content": (
+                f"Result: {obs.get('hint','')}. "
+                f"Metrics: {json.dumps(obs.get('metrics',{}))}"
+            )})
+        except Exception as e:
+            print(f"  [ep {episode}] step error: {e}", file=sys.stderr)
+            step_count += 1
+            history.append({"role": "user", "content": f"Error: {e}"})
             continue
 
         # Force submit near step limit
@@ -461,6 +574,10 @@ def run_agent_episode(
         score = last_rec.cumulative_reward if hasattr(last_rec, "cumulative_reward") else 0.0
     else:
         score = _grade_from_obs(obs)
+
+    # ── Change 2: Record best episodes for few-shot self-improvement ──
+    if score >= 0.95 and episode_actions:
+        record_best_episode(task_id, score, episode_actions)
 
     return score, step_count
 
