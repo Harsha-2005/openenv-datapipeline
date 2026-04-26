@@ -7,10 +7,17 @@ _env is now a stateful session manager that tracks current task_id + seed.
 """
 
 from __future__ import annotations
+<<<<<<< HEAD
 import os
 from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, HTTPException
+=======
+import asyncio, json, os, io, csv, time
+from typing import Any, Dict, List, Optional
+
+from fastapi import FastAPI, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from pydantic import BaseModel
@@ -196,8 +203,15 @@ def step(req: StepRequest):
     try:
         obs = _session.step(action)
         last_reward = 0.0
+<<<<<<< HEAD
         if _session._env and _session._env.history:
             last_reward = _session._env.history[-1].reward
+=======
+        last_rec = None
+        if _session._env and _session._env.history:
+            last_rec = _session._env.history[-1]
+            last_reward = last_rec.reward
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
 
         # Wrap in StepResult shape for backward compatibility with inference.py
         payload = {
@@ -205,7 +219,11 @@ def step(req: StepRequest):
             "reward": {
                 "value":       last_reward,
                 "cumulative":  _session._env._cumulative_reward if _session._env else 0.0,
+<<<<<<< HEAD
                 "components":  {},
+=======
+                "components":  last_rec.reward_components if last_rec else {},
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
                 "explanation": obs.hint,
             },
             "done": obs.done,
@@ -214,6 +232,16 @@ def step(req: StepRequest):
                 "step_count":   obs.step_count,
                 "action_result": obs.hint,
             },
+<<<<<<< HEAD
+=======
+            # Explainability fields
+            "explainability": {
+                "reasoning":          last_rec.reasoning if last_rec else "",
+                "observation_summary": last_rec.observation_summary if last_rec else "",
+                "reward_components":  last_rec.reward_components if last_rec else {},
+                "alternatives":       last_rec.alternatives if last_rec else [],
+            } if last_rec else None,
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
         }
         return _sanitize_for_json(payload)
     except RuntimeError as e:
@@ -266,12 +294,34 @@ def demo_mode():
     """Serve the standalone auto-demo presentation."""
     from demo import get_demo_html
     return HTMLResponse(content=get_demo_html(), status_code=200)
+    try:
+        from demo import get_demo_html
+        return HTMLResponse(content=get_demo_html(), status_code=200)
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        print(f"[ERROR] /demo failed: {e}\n{tb}", flush=True)
+        return HTMLResponse(
+            content=f"<html><body><h1>Demo Error</h1><pre>{tb}</pre></body></html>",
+            status_code=500,
+        )
 
 @app.get("/compete", response_class=HTMLResponse)
 def compete_mode():
     """Serve the side-by-side competition mode."""
     from compete import get_compete_html
     return HTMLResponse(content=get_compete_html(), status_code=200)
+    try:
+        from compete import get_compete_html
+        return HTMLResponse(content=get_compete_html(), status_code=200)
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        print(f"[ERROR] /compete failed: {e}\n{tb}", flush=True)
+        return HTMLResponse(
+            content=f"<html><body><h1>Compete Error</h1><pre>{tb}</pre></body></html>",
+            status_code=500,
+        )
 
 
 @app.get("/api/benchmark")
@@ -283,6 +333,220 @@ def run_benchmark_api():
         return {"status": "ok", "results": results}
     except Exception as e:
         return {"status": "error", "message": str(e), "results": []}
+
+
+@app.get("/api/replay")
+def get_replay():
+    """Return full step history with explainability data for the last episode."""
+    if _session._env is None or not _session._env.history:
+        return {"steps": [], "task_id": None}
+    return _sanitize_for_json({
+        "task_id": _session._task_id,
+        "steps": [rec.to_dict() for rec in _session._env.history],
+    })
+
+
+# ---------------------------------------------------------------------------
+# Feature 2: WebSocket live training stream
+# ---------------------------------------------------------------------------
+_ws_clients: list[WebSocket] = []
+
+@app.websocket("/ws/train")
+async def ws_train(websocket: WebSocket):
+    """Stream live training scores to the dashboard."""
+    await websocket.accept()
+    _ws_clients.append(websocket)
+    try:
+        while True:
+            # Keep connection alive; client can send 'ping'
+            data = await websocket.receive_text()
+            if data == "ping":
+                await websocket.send_json({"type": "pong"})
+    except WebSocketDisconnect:
+        _ws_clients.remove(websocket)
+
+
+async def broadcast_training_event(event: dict):
+    """Called by training loops to push live updates to all connected dashboards."""
+    dead = []
+    for ws in _ws_clients:
+        try:
+            await ws.send_json(event)
+        except Exception:
+            dead.append(ws)
+    for ws in dead:
+        _ws_clients.remove(ws)
+
+
+@app.post("/api/train-episode")
+async def train_episode_api():
+    """Run one training episode and stream scores via WebSocket."""
+    import random
+    task_ids = list(TASK_REGISTRY.keys())
+    task_id = random.choice(task_ids)
+    seed = random.randint(1, 9999)
+
+    env = DataPipelineEnv(task_id=task_id, seed=seed)
+    obs = env.reset()
+
+    actions_sequence = [
+        "inspect", "cast_column", "drop_duplicates", "fill_nulls",
+        "filter_outliers", "validate", "submit"
+    ]
+
+    episode_reward = 0.0
+    step_num = 0
+    done = False
+
+    for act_name in actions_sequence:
+        if done:
+            break
+        act = Action(action_type=ActionType(act_name))
+        if act_name == "cast_column" and obs.schema_info:
+            act.column = obs.schema_info[0].name
+            act.value = obs.schema_info[0].expected_type
+        elif act_name == "fill_nulls" and obs.schema_info:
+            act.column = obs.schema_info[0].name
+            act.value = "0"
+        elif act_name == "filter_outliers" and obs.schema_info:
+            for sf in obs.schema_info:
+                if sf.expected_type in ("int", "float", "int64", "float64"):
+                    act.column = sf.name
+                    break
+            if not act.column and obs.schema_info:
+                act.column = obs.schema_info[0].name
+            act.value = "0,99999"
+
+        try:
+            obs = env.step(act)
+        except Exception:
+            break
+        step_num += 1
+        done = obs.done
+        if env.history:
+            episode_reward = env.history[-1].cumulative_reward
+
+        # Broadcast each step live
+        await broadcast_training_event({
+            "type": "step",
+            "task_id": task_id,
+            "step": step_num,
+            "action": act_name,
+            "reward": round(env.history[-1].reward, 4) if env.history else 0,
+            "cumulative": round(episode_reward, 4),
+        })
+        await asyncio.sleep(0.15)  # Pacing for visual effect
+
+    # Broadcast episode summary
+    await broadcast_training_event({
+        "type": "episode_end",
+        "task_id": task_id,
+        "total_steps": step_num,
+        "final_score": round(episode_reward, 4),
+    })
+    return {"status": "ok", "task_id": task_id, "score": round(episode_reward, 4), "steps": step_num}
+
+
+# ---------------------------------------------------------------------------
+# Feature 3: CSV upload + auto-debug
+# ---------------------------------------------------------------------------
+
+@app.post("/api/upload-debug")
+async def upload_debug(file: UploadFile = File(...)):
+    """
+    Upload a CSV file. The agent will auto-debug it using the easy schema task
+    as a template, but with the user's data injected.
+    Returns step-by-step debug results.
+    """
+    import pandas as pd
+
+    content = await file.read()
+    try:
+        df = pd.read_csv(io.BytesIO(content))
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to parse CSV: {e}", "steps": []}
+
+    if len(df) == 0:
+        return {"status": "error", "message": "CSV is empty.", "steps": []}
+
+    # Create a custom environment with the user's data
+    task_id = "task_easy_schema_fix"  # Use as template
+    env = DataPipelineEnv(task_id=task_id, seed=42)
+    obs = env.reset()
+
+    # Inject user's data into the environment
+    from env.environment import _df_to_data, _recompute_metrics
+    env._df = df
+    env.state.data = _df_to_data(df)
+    # Build schema from CSV columns
+    from env.models import SchemaField
+    env.state.schema_info = [
+        SchemaField(name=col, expected_type=str(df[col].dtype), actual_type=str(df[col].dtype))
+        for col in df.columns
+    ]
+    env.state.metrics = _recompute_metrics(env.state.data, env.state.schema_info)
+
+    # Auto-debug sequence
+    actions_seq = ["inspect", "drop_duplicates", "validate"]
+    # Add fill_nulls for columns with nulls
+    for col in df.columns:
+        if df[col].isnull().any():
+            actions_seq.insert(2, "fill_nulls")
+            break
+
+    results = []
+    for act_name in actions_seq:
+        act = Action(action_type=ActionType(act_name))
+        if act_name == "fill_nulls":
+            for col in df.columns:
+                if df[col].isnull().any():
+                    act.column = col
+                    act.value = "0"
+                    break
+        try:
+            obs = env.step(act)
+        except Exception as e:
+            results.append({"action": act_name, "error": str(e)})
+            break
+
+        rec = env.history[-1] if env.history else None
+        results.append({
+            "step": len(results) + 1,
+            "action": act_name,
+            "description": rec.description if rec else "",
+            "reasoning": rec.reasoning if rec else "",
+            "reward": round(rec.reward, 4) if rec else 0,
+            "observation_summary": rec.observation_summary if rec else "",
+            "bugs_remaining": rec.bugs_remaining if rec else 0,
+        })
+
+    # Final submit
+    try:
+        act = Action(action_type=ActionType.SUBMIT)
+        obs = env.step(act)
+        rec = env.history[-1]
+        results.append({
+            "step": len(results) + 1,
+            "action": "submit",
+            "description": rec.description,
+            "reasoning": rec.reasoning,
+            "reward": round(rec.reward, 4),
+            "observation_summary": rec.observation_summary,
+            "bugs_remaining": rec.bugs_remaining,
+        })
+    except Exception:
+        pass
+
+    return _sanitize_for_json({
+        "status": "ok",
+        "filename": file.filename,
+        "rows": len(df),
+        "columns": list(df.columns),
+        "null_counts": {col: int(df[col].isnull().sum()) for col in df.columns},
+        "duplicate_count": int(df.duplicated().sum()),
+        "steps": results,
+        "final_score": round(env._cumulative_reward, 4),
+    })
 
 
 # ---------------------------------------------------------------------------
