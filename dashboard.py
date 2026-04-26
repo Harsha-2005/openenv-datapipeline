@@ -23,10 +23,8 @@ def get_dashboard_html() -> str:
             --sidebar-width: 240px;
             --success: #059669;
             --danger: #dc2626;
-<<<<<<< HEAD
         }
 
-=======
             --navbar-height: 56px;
         }
 
@@ -113,7 +111,6 @@ def get_dashboard_html() -> str:
         .status-dot.online  { background: #10b981; box-shadow: 0 0 6px #10b981; }
         .status-dot.offline { background: #ef4444; }
 
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
@@ -132,12 +129,9 @@ def get_dashboard_html() -> str:
             border-right: 1px solid var(--border-color);
             padding: 1.5rem 0;
             position: fixed;
-<<<<<<< HEAD
             height: 100vh;
-=======
             top: var(--navbar-height);
             height: calc(100vh - var(--navbar-height));
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
             overflow-y: auto;
         }
 
@@ -185,10 +179,7 @@ def get_dashboard_html() -> str:
         /* Main Content */
         .main {
             margin-left: var(--sidebar-width);
-<<<<<<< HEAD
-=======
             margin-top: var(--navbar-height);
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
             flex: 1;
             padding: 2rem 3rem;
             max-width: 1200px;
@@ -350,8 +341,6 @@ def get_dashboard_html() -> str:
 </head>
 <body>
 
-<<<<<<< HEAD
-=======
     <!-- ── Global Navigation Bar ────────────────────────── -->
     <nav class="topnav">
         <a class="topnav-brand" href="/">
@@ -384,7 +373,6 @@ def get_dashboard_html() -> str:
         </div>
     </nav>
 
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
     <nav class="sidebar">
         <div class="brand">
             <h1>OpenEnv Debugger</h1>
@@ -397,13 +385,10 @@ def get_dashboard_html() -> str:
         <div class="nav-header">Evaluation</div>
         <div class="nav-item" onclick="showPanel('benchmarks')">Benchmarks</div>
         <div class="nav-item" onclick="showPanel('docs')">System Docs</div>
-<<<<<<< HEAD
-=======
         <div class="nav-header">Advanced</div>
         <div class="nav-item" id="nav-explain" onclick="showPanel('explain')">&#129504; Explainability</div>
         <div class="nav-item" id="nav-live" onclick="showPanel('live')">&#128307; Live Training</div>
         <div class="nav-item" id="nav-upload" onclick="showPanel('upload')">&#128196; CSV Auto-Debug</div>
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
     </nav>
 
     <main class="main">
@@ -471,14 +456,11 @@ def get_dashboard_html() -> str:
                         <option value="task_expert_multi_source_join">Expert: Multi-Source</option>
                     </select>
                     <input type="number" id="run-seed" value="42" style="width: 80px;" placeholder="Seed">
-<<<<<<< HEAD
                     <button class="primary" onclick="runEpisode()">Run Episode</button>
                     <button onclick="clearResults()">Clear</button>
-=======
                     <button class="primary" id="run-btn" onclick="runEpisode()">&#9654; Run Episode</button>
                     <button onclick="clearResults()">Clear</button>
                     <span id="run-progress" style="font-size:0.85rem;color:var(--text-muted)"></span>
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
                 </div>
             </div>
 
@@ -496,8 +478,6 @@ def get_dashboard_html() -> str:
                     </div>
                 </div>
             </div>
-<<<<<<< HEAD
-=======
 
             <!-- Charts row -->
             <div class="grid" id="run-charts" style="display:none">
@@ -510,7 +490,6 @@ def get_dashboard_html() -> str:
                     <canvas id="metricChart" style="width:100%;display:block;height:180px"></canvas>
                 </div>
             </div>
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
         </div>
 
         <!-- Benchmarks Panel -->
@@ -564,8 +543,6 @@ R(t) = base_progress
             </div>
         </div>
 
-<<<<<<< HEAD
-=======
         <!-- Explainability Panel -->
         <div id="panel-explain" class="panel">
             <div class="page-title"><h2>&#129504; Explainability Replay</h2></div>
@@ -624,7 +601,6 @@ R(t) = base_progress
             <div id="upload-steps"></div>
         </div>
 
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
     </main>
 
     <script>
@@ -636,27 +612,22 @@ R(t) = base_progress
             event.currentTarget.classList.add('active');
         }
 
-<<<<<<< HEAD
         // Server Health Auto-Check
         async function checkHealth() {
             const badge = document.getElementById('sys-status');
-=======
         // Server Health Auto-Check (sidebar badge + navbar dot)
         async function checkHealth() {
             const badge   = document.getElementById('sys-status');
             const dot     = document.getElementById('nav-dot');
             const navText = document.getElementById('nav-status-text');
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
             try {
                 const res = await fetch('/health');
                 if (res.ok) {
                     badge.textContent = 'System Online';
                     badge.classList.add('online');
-<<<<<<< HEAD
                 } else {
                     badge.textContent = 'Server Error';
                     badge.classList.remove('online');
-=======
                     dot.className = 'status-dot online';
                     navText.textContent = 'Online';
                     navText.style.color = '#10b981';
@@ -666,17 +637,13 @@ R(t) = base_progress
                     dot.className = 'status-dot offline';
                     navText.textContent = 'Error';
                     navText.style.color = '#ef4444';
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
                 }
             } catch {
                 badge.textContent = 'Server Offline';
                 badge.classList.remove('online');
-<<<<<<< HEAD
-=======
                 dot.className = 'status-dot offline';
                 navText.textContent = 'Offline';
                 navText.style.color = '#ef4444';
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
             }
         }
         setInterval(checkHealth, 15000);
@@ -688,14 +655,12 @@ R(t) = base_progress
             const seed = parseInt(document.getElementById('run-seed').value) || 42;
             const metOut = document.getElementById('metrics-output');
             const logOut = document.getElementById('log-output');
-<<<<<<< HEAD
 
             metOut.innerHTML = 'Resetting environment...';
             logOut.innerHTML = '';
 
             try {
                 // Initialize episode
-=======
             const prog   = document.getElementById('run-progress');
             const btn    = document.getElementById('run-btn');
 
@@ -711,16 +676,12 @@ R(t) = base_progress
             const _labels  = [];
 
             try {
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
                 let res = await fetch('/reset', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({task_id: taskId, seed: seed})
                 });
-<<<<<<< HEAD
                 
-=======
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
                 if (!res.ok) throw new Error(await res.text());
                 let obs = await res.json();
 
@@ -728,14 +689,11 @@ R(t) = base_progress
                 let done = obs.done || false;
                 let logsHtml = '';
                 const maxSteps = obs.max_steps || 40;
-<<<<<<< HEAD
 
                 metOut.innerHTML = `Running task wrapper for ${taskId}...`;
-=======
                 let cumReward = 0;
 
                 prog.textContent = `Step 0 / ${maxSteps}`;
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
 
                 while (!done && stepNum < maxSteps) {
                     const action = chooseSimpleAction(obs, stepNum);
@@ -744,7 +702,6 @@ R(t) = base_progress
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify(action)
                     });
-<<<<<<< HEAD
                     
                     if (!stepRes.ok) throw new Error(await stepRes.text());
                     const payload = await stepRes.json();
@@ -761,7 +718,6 @@ R(t) = base_progress
                             <div class="timeline-action">Step ${stepNum}: ${action.action_type}</div>
                             <div class="timeline-desc">${obs.hint || 'Action executed.'} | Reward: ${rewStr}</div>
                         </div>`;
-=======
                     if (!stepRes.ok) throw new Error(await stepRes.text());
                     const payload = await stepRes.json();
                     obs = payload.observation || payload;
@@ -792,7 +748,6 @@ R(t) = base_progress
                         </div>`;
 
                     prog.textContent = `Step ${stepNum} / ${maxSteps}  |  Cumulative: ${cumReward.toFixed(4)}`;
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
                 }
 
                 if (!done) {
@@ -801,14 +756,12 @@ R(t) = base_progress
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({action_type: 'submit'})
                     });
-<<<<<<< HEAD
                     obs = await subRes.json();
                     logsHtml += `
                         <div class="timeline-item">
                             <div class="timeline-action">Step ${stepNum+1}: submit</div>
                             <div class="timeline-desc">Forced submission due to timeout.</div>
                         </div>`;
-=======
                     const subPayload = await subRes.json();
                     const subObs = subPayload.observation || subPayload;
                     const subRew = subPayload.reward?.value || 0;
@@ -823,12 +776,10 @@ R(t) = base_progress
                             <div class="timeline-desc">Forced submission. Final cumulative: ${cumReward.toFixed(4)}</div>
                         </div>`;
                     obs = subObs;
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
                 }
 
                 const m = obs.metrics || {};
                 metOut.innerHTML = `
-<<<<<<< HEAD
                     <div style="display:flex; flex-direction:column; gap:0.5rem;">
                         <div><strong>Steps Consumed:</strong> ${stepNum}</div>
                         <div><strong>Data Completeness:</strong> ${(m.completeness||0).toFixed(4)}</div>
@@ -843,7 +794,6 @@ R(t) = base_progress
             }
         }
 
-=======
                     <div style="display:flex;flex-direction:column;gap:0.5rem">
                         <div><strong>Steps:</strong> ${stepNum}</div>
                         <div><strong>Cumulative Reward:</strong> <span style="font-weight:700;color:var(--primary-color)">${cumReward.toFixed(4)}</span></div>
@@ -970,7 +920,6 @@ R(t) = base_progress
         }
 
 
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
         // Basic heuristic client for demo purposes
         function chooseSimpleAction(obs, stepNum) {
             if (stepNum === 0) {
@@ -1069,8 +1018,6 @@ R(t) = base_progress
                 resArea.innerHTML = `<div class="card" style="color:var(--danger)">Failed to evaluate: ${e.message}</div>`;
             }
         }
-<<<<<<< HEAD
-=======
 
         // ── Feature 1: Explainability Replay ──────────────────────────
         async function loadReplay() {
@@ -1238,7 +1185,6 @@ R(t) = base_progress
                 });
             } catch(e) { status.textContent = '❌ Error: ' + e.message; }
         }
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
     </script>
 </body>
 </html>"""
