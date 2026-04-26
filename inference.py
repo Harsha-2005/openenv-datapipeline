@@ -16,8 +16,6 @@ import json, os, re, sys, time, traceback
 from typing import Any, Dict, List, Optional
 
 # ---------------------------------------------------------------------------
-<<<<<<< HEAD
-=======
 # Load .env file (for local runs — on HF Space env vars are set via secrets)
 # ---------------------------------------------------------------------------
 try:
@@ -27,7 +25,6 @@ except ImportError:
     pass  # dotenv not required — env vars may be set externally
 
 # ---------------------------------------------------------------------------
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
 # Configuration — read from environment variables
 # ---------------------------------------------------------------------------
 API_BASE_URL = os.environ.get("API_BASE_URL", "")
