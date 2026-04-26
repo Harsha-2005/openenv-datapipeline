@@ -23,8 +23,97 @@ def get_dashboard_html() -> str:
             --sidebar-width: 240px;
             --success: #059669;
             --danger: #dc2626;
+<<<<<<< HEAD
         }
 
+=======
+            --navbar-height: 56px;
+        }
+
+        /* ── Global Navbar ───────────────────────────── */
+        .topnav {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: var(--navbar-height);
+            background: #0f172a;
+            border-bottom: 1px solid #1e293b;
+            display: flex;
+            align-items: center;
+            padding: 0 1.5rem;
+            gap: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+        }
+        .topnav-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: #f1f5f9;
+            text-decoration: none;
+            margin-right: 2rem;
+            letter-spacing: -0.01em;
+            white-space: nowrap;
+        }
+        .topnav-brand .logo-dot {
+            width: 8px; height: 8px;
+            background: #6366f1;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .topnav-links {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            flex: 1;
+        }
+        .topnav-link {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.4rem 0.85rem;
+            border-radius: 6px;
+            color: #94a3b8;
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: background 0.18s, color 0.18s;
+            white-space: nowrap;
+        }
+        .topnav-link:hover {
+            background: rgba(255,255,255,0.07);
+            color: #f1f5f9;
+        }
+        .topnav-link.active {
+            background: rgba(99,102,241,0.18);
+            color: #818cf8;
+        }
+        .topnav-link .nav-icon { font-size: 0.9rem; }
+        .topnav-divider {
+            width: 1px;
+            height: 20px;
+            background: #1e293b;
+            margin: 0 0.5rem;
+        }
+        .topnav-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.78rem;
+            font-weight: 500;
+            margin-left: auto;
+        }
+        .status-dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: #334155;
+            transition: background 0.3s;
+        }
+        .status-dot.online  { background: #10b981; box-shadow: 0 0 6px #10b981; }
+        .status-dot.offline { background: #ef4444; }
+
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
@@ -43,7 +132,12 @@ def get_dashboard_html() -> str:
             border-right: 1px solid var(--border-color);
             padding: 1.5rem 0;
             position: fixed;
+<<<<<<< HEAD
             height: 100vh;
+=======
+            top: var(--navbar-height);
+            height: calc(100vh - var(--navbar-height));
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
             overflow-y: auto;
         }
 
@@ -91,6 +185,10 @@ def get_dashboard_html() -> str:
         /* Main Content */
         .main {
             margin-left: var(--sidebar-width);
+<<<<<<< HEAD
+=======
+            margin-top: var(--navbar-height);
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
             flex: 1;
             padding: 2rem 3rem;
             max-width: 1200px;
@@ -252,6 +350,41 @@ def get_dashboard_html() -> str:
 </head>
 <body>
 
+<<<<<<< HEAD
+=======
+    <!-- ── Global Navigation Bar ────────────────────────── -->
+    <nav class="topnav">
+        <a class="topnav-brand" href="/">
+            <span class="logo-dot"></span> OpenEnv Debugger
+        </a>
+        <div class="topnav-links">
+            <a class="topnav-link active" href="/dashboard">
+                <span class="nav-icon">📊</span> Dashboard
+            </a>
+            <a class="topnav-link" href="/demo">
+                <span class="nav-icon">🎬</span> Demo
+            </a>
+            <a class="topnav-link" href="/compete">
+                <span class="nav-icon">⚔️</span> Compete
+            </a>
+            <div class="topnav-divider"></div>
+            <a class="topnav-link" href="/docs" target="_blank">
+                <span class="nav-icon">📖</span> API Docs
+            </a>
+            <a class="topnav-link" href="/tasks" target="_blank">
+                <span class="nav-icon">📋</span> Tasks
+            </a>
+            <a class="topnav-link" href="/health" target="_blank">
+                <span class="nav-icon">🩺</span> Health
+            </a>
+        </div>
+        <div class="topnav-status">
+            <span class="status-dot" id="nav-dot"></span>
+            <span id="nav-status-text" style="color:#94a3b8;">Connecting...</span>
+        </div>
+    </nav>
+
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
     <nav class="sidebar">
         <div class="brand">
             <h1>OpenEnv Debugger</h1>
@@ -264,6 +397,13 @@ def get_dashboard_html() -> str:
         <div class="nav-header">Evaluation</div>
         <div class="nav-item" onclick="showPanel('benchmarks')">Benchmarks</div>
         <div class="nav-item" onclick="showPanel('docs')">System Docs</div>
+<<<<<<< HEAD
+=======
+        <div class="nav-header">Advanced</div>
+        <div class="nav-item" id="nav-explain" onclick="showPanel('explain')">&#129504; Explainability</div>
+        <div class="nav-item" id="nav-live" onclick="showPanel('live')">&#128307; Live Training</div>
+        <div class="nav-item" id="nav-upload" onclick="showPanel('upload')">&#128196; CSV Auto-Debug</div>
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
     </nav>
 
     <main class="main">
@@ -331,8 +471,14 @@ def get_dashboard_html() -> str:
                         <option value="task_expert_multi_source_join">Expert: Multi-Source</option>
                     </select>
                     <input type="number" id="run-seed" value="42" style="width: 80px;" placeholder="Seed">
+<<<<<<< HEAD
                     <button class="primary" onclick="runEpisode()">Run Episode</button>
                     <button onclick="clearResults()">Clear</button>
+=======
+                    <button class="primary" id="run-btn" onclick="runEpisode()">&#9654; Run Episode</button>
+                    <button onclick="clearResults()">Clear</button>
+                    <span id="run-progress" style="font-size:0.85rem;color:var(--text-muted)"></span>
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
                 </div>
             </div>
 
@@ -350,6 +496,21 @@ def get_dashboard_html() -> str:
                     </div>
                 </div>
             </div>
+<<<<<<< HEAD
+=======
+
+            <!-- Charts row -->
+            <div class="grid" id="run-charts" style="display:none">
+                <div class="card">
+                    <div class="card-header">&#128200; Step Reward</div>
+                    <canvas id="rewardChart" style="width:100%;display:block;height:180px"></canvas>
+                </div>
+                <div class="card">
+                    <div class="card-header">&#128203; Metric Progression</div>
+                    <canvas id="metricChart" style="width:100%;display:block;height:180px"></canvas>
+                </div>
+            </div>
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
         </div>
 
         <!-- Benchmarks Panel -->
@@ -403,6 +564,67 @@ R(t) = base_progress
             </div>
         </div>
 
+<<<<<<< HEAD
+=======
+        <!-- Explainability Panel -->
+        <div id="panel-explain" class="panel">
+            <div class="page-title"><h2>&#129504; Explainability Replay</h2></div>
+            <div class="card" style="margin-bottom:1rem">
+                <div class="card-header">Load Last Episode Replay</div>
+                <div class="ctrl-group">
+                    <button class="primary" onclick="loadReplay()">Load Replay from Last Episode</button>
+                    <span id="explain-status" style="font-size:0.85rem;color:var(--text-muted)"></span>
+                </div>
+            </div>
+            <div id="explain-steps"></div>
+        </div>
+
+        <!-- Live Training Panel -->
+        <div id="panel-live" class="panel">
+            <div class="page-title"><h2>&#128307; Live Training Stream</h2></div>
+            <div class="card">
+                <div class="ctrl-group">
+                    <button class="primary" id="train-btn" onclick="startTraining()">&#9654; Run Training Episode</button>
+                    <span id="ws-status" style="font-size:0.85rem;color:var(--text-muted)">WebSocket: disconnected</span>
+                </div>
+                <div style="display:flex;gap:1rem;margin-top:0.75rem;flex-wrap:wrap">
+                    <div class="stat-box" style="flex:1"><div class="stat-label">Episode</div><div class="stat-val" id="live-ep">0</div></div>
+                    <div class="stat-box" style="flex:1"><div class="stat-label">Step</div><div class="stat-val" id="live-step">-</div></div>
+                    <div class="stat-box" style="flex:1"><div class="stat-label">Cumulative Reward</div><div class="stat-val" id="live-reward">0.00</div></div>
+                    <div class="stat-box" style="flex:1"><div class="stat-label">Last Action</div><div class="stat-val" id="live-action" style="font-size:1rem">-</div></div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">Score Chart (real-time)</div>
+                <canvas id="liveChart" height="200" style="width:100%;display:block"></canvas>
+            </div>
+            <div class="card">
+                <div class="card-header">Step Log</div>
+                <div id="live-log" class="timeline" style="max-height:250px"></div>
+            </div>
+        </div>
+
+        <!-- CSV Upload Panel -->
+        <div id="panel-upload" class="panel">
+            <div class="page-title"><h2>&#128196; CSV Auto-Debug</h2></div>
+            <div class="card">
+                <div class="card-header">Upload Your CSV</div>
+                <div id="drop-zone" onclick="document.getElementById('csv-file').click()" style="border:2px dashed var(--border-color);border-radius:8px;padding:3rem;text-align:center;cursor:pointer;transition:border-color 0.2s;margin-bottom:1rem" ondragover="event.preventDefault();this.style.borderColor='var(--primary-color)'" ondragleave="this.style.borderColor='var(--border-color)'" ondrop="handleDrop(event)">
+                    <div style="font-size:2.5rem;margin-bottom:0.5rem">&#128196;</div>
+                    <div style="font-weight:600">Drop your CSV file here or click to browse</div>
+                    <div style="font-size:0.85rem;color:var(--text-muted);margin-top:0.25rem">The agent will automatically detect and fix data quality issues</div>
+                </div>
+                <input type="file" id="csv-file" accept=".csv" style="display:none" onchange="uploadCSV(this.files[0])">
+                <span id="upload-status" style="font-size:0.85rem;color:var(--text-muted)"></span>
+            </div>
+            <div id="upload-summary" style="display:none" class="card">
+                <div class="card-header">Dataset Summary</div>
+                <div id="upload-meta" style="font-size:0.9rem;line-height:2"></div>
+            </div>
+            <div id="upload-steps"></div>
+        </div>
+
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
     </main>
 
     <script>
@@ -414,21 +636,47 @@ R(t) = base_progress
             event.currentTarget.classList.add('active');
         }
 
+<<<<<<< HEAD
         // Server Health Auto-Check
         async function checkHealth() {
             const badge = document.getElementById('sys-status');
+=======
+        // Server Health Auto-Check (sidebar badge + navbar dot)
+        async function checkHealth() {
+            const badge   = document.getElementById('sys-status');
+            const dot     = document.getElementById('nav-dot');
+            const navText = document.getElementById('nav-status-text');
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
             try {
                 const res = await fetch('/health');
                 if (res.ok) {
                     badge.textContent = 'System Online';
                     badge.classList.add('online');
+<<<<<<< HEAD
                 } else {
                     badge.textContent = 'Server Error';
                     badge.classList.remove('online');
+=======
+                    dot.className = 'status-dot online';
+                    navText.textContent = 'Online';
+                    navText.style.color = '#10b981';
+                } else {
+                    badge.textContent = 'Server Error';
+                    badge.classList.remove('online');
+                    dot.className = 'status-dot offline';
+                    navText.textContent = 'Error';
+                    navText.style.color = '#ef4444';
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
                 }
             } catch {
                 badge.textContent = 'Server Offline';
                 badge.classList.remove('online');
+<<<<<<< HEAD
+=======
+                dot.className = 'status-dot offline';
+                navText.textContent = 'Offline';
+                navText.style.color = '#ef4444';
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
             }
         }
         setInterval(checkHealth, 15000);
@@ -440,18 +688,39 @@ R(t) = base_progress
             const seed = parseInt(document.getElementById('run-seed').value) || 42;
             const metOut = document.getElementById('metrics-output');
             const logOut = document.getElementById('log-output');
+<<<<<<< HEAD
 
             metOut.innerHTML = 'Resetting environment...';
             logOut.innerHTML = '';
 
             try {
                 // Initialize episode
+=======
+            const prog   = document.getElementById('run-progress');
+            const btn    = document.getElementById('run-btn');
+
+            metOut.innerHTML = 'Resetting environment...';
+            logOut.innerHTML = '';
+            document.getElementById('run-charts').style.display = 'none';
+            btn.disabled = true; btn.textContent = '⏳ Running...';
+            prog.textContent = '';
+
+            // Per-step data for charts
+            const _rewards = [];   // {step, val}
+            const _metrics = [];   // {step, completeness, uniqueness, validity}
+            const _labels  = [];
+
+            try {
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
                 let res = await fetch('/reset', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({task_id: taskId, seed: seed})
                 });
+<<<<<<< HEAD
                 
+=======
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
                 if (!res.ok) throw new Error(await res.text());
                 let obs = await res.json();
 
@@ -459,8 +728,14 @@ R(t) = base_progress
                 let done = obs.done || false;
                 let logsHtml = '';
                 const maxSteps = obs.max_steps || 40;
+<<<<<<< HEAD
 
                 metOut.innerHTML = `Running task wrapper for ${taskId}...`;
+=======
+                let cumReward = 0;
+
+                prog.textContent = `Step 0 / ${maxSteps}`;
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
 
                 while (!done && stepNum < maxSteps) {
                     const action = chooseSimpleAction(obs, stepNum);
@@ -469,6 +744,7 @@ R(t) = base_progress
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify(action)
                     });
+<<<<<<< HEAD
                     
                     if (!stepRes.ok) throw new Error(await stepRes.text());
                     const payload = await stepRes.json();
@@ -485,6 +761,38 @@ R(t) = base_progress
                             <div class="timeline-action">Step ${stepNum}: ${action.action_type}</div>
                             <div class="timeline-desc">${obs.hint || 'Action executed.'} | Reward: ${rewStr}</div>
                         </div>`;
+=======
+                    if (!stepRes.ok) throw new Error(await stepRes.text());
+                    const payload = await stepRes.json();
+                    obs = payload.observation || payload;
+
+                    stepNum++;
+                    done = payload.done || obs.done || false;
+                    const rewVal = (typeof payload.reward === 'number') ? payload.reward : (payload.reward?.value || 0);
+                    cumReward = payload.reward?.cumulative ?? (cumReward + rewVal);
+                    const m = obs.metrics || {};
+
+                    // Collect chart data
+                    _labels.push(`S${stepNum}`);
+                    _rewards.push(rewVal);
+                    _metrics.push({
+                        completeness: m.completeness || 0,
+                        uniqueness:   m.uniqueness   || 0,
+                        validity:     m.validity     || 0,
+                    });
+
+                    const rewStr = rewVal > 0
+                        ? `<span class="pos-amount">+${rewVal.toFixed(4)}</span>`
+                        : `<span class="neg-amount">${rewVal.toFixed(4)}</span>`;
+
+                    logsHtml += `
+                        <div class="timeline-item">
+                            <div class="timeline-action">Step ${stepNum}: ${action.action_type}</div>
+                            <div class="timeline-desc">${obs.hint || 'Action executed.'} | Reward: ${rewStr} | Cumulative: ${cumReward.toFixed(4)}</div>
+                        </div>`;
+
+                    prog.textContent = `Step ${stepNum} / ${maxSteps}  |  Cumulative: ${cumReward.toFixed(4)}`;
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
                 }
 
                 if (!done) {
@@ -493,16 +801,34 @@ R(t) = base_progress
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({action_type: 'submit'})
                     });
+<<<<<<< HEAD
                     obs = await subRes.json();
                     logsHtml += `
                         <div class="timeline-item">
                             <div class="timeline-action">Step ${stepNum+1}: submit</div>
                             <div class="timeline-desc">Forced submission due to timeout.</div>
                         </div>`;
+=======
+                    const subPayload = await subRes.json();
+                    const subObs = subPayload.observation || subPayload;
+                    const subRew = subPayload.reward?.value || 0;
+                    cumReward = subPayload.reward?.cumulative ?? cumReward;
+                    const subM  = subObs.metrics || {};
+                    _labels.push(`S${stepNum+1}`);
+                    _rewards.push(subRew);
+                    _metrics.push({ completeness: subM.completeness||0, uniqueness: subM.uniqueness||0, validity: subM.validity||0 });
+                    logsHtml += `
+                        <div class="timeline-item">
+                            <div class="timeline-action">Step ${stepNum+1}: submit</div>
+                            <div class="timeline-desc">Forced submission. Final cumulative: ${cumReward.toFixed(4)}</div>
+                        </div>`;
+                    obs = subObs;
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
                 }
 
                 const m = obs.metrics || {};
                 metOut.innerHTML = `
+<<<<<<< HEAD
                     <div style="display:flex; flex-direction:column; gap:0.5rem;">
                         <div><strong>Steps Consumed:</strong> ${stepNum}</div>
                         <div><strong>Data Completeness:</strong> ${(m.completeness||0).toFixed(4)}</div>
@@ -517,6 +843,134 @@ R(t) = base_progress
             }
         }
 
+=======
+                    <div style="display:flex;flex-direction:column;gap:0.5rem">
+                        <div><strong>Steps:</strong> ${stepNum}</div>
+                        <div><strong>Cumulative Reward:</strong> <span style="font-weight:700;color:var(--primary-color)">${cumReward.toFixed(4)}</span></div>
+                        <div><strong>Completeness:</strong> ${(m.completeness||0).toFixed(4)}</div>
+                        <div><strong>Uniqueness:</strong>   ${(m.uniqueness||0).toFixed(4)}</div>
+                        <div><strong>Validity:</strong>     ${(m.validity||0).toFixed(4)}</div>
+                    </div>`;
+                logOut.innerHTML = logsHtml;
+                prog.textContent = `Done — ${stepNum} steps, score ${cumReward.toFixed(4)}`;
+
+                // Show container FIRST so clientWidth is non-zero, then draw
+                document.getElementById('run-charts').style.display = 'grid';
+                requestAnimationFrame(() => {
+                    _drawRewardChart(_labels, _rewards);
+                    _drawMetricChart(_labels, _metrics);
+                });
+
+            } catch (err) {
+                metOut.innerHTML = `<span style="color:var(--danger)">Error: ${err.message}</span>`;
+            } finally {
+                btn.disabled = false; btn.textContent = '▶ Run Episode';
+            }
+        }
+
+        function _drawRewardChart(labels, rewards) {
+            // Build cumulative from per-step rewards
+            const cumulative = [];
+            let running = 0;
+            rewards.forEach(r => { running += r; cumulative.push(running); });
+            _drawEpisodeChart('rewardChart', labels, cumulative);
+        }
+
+        function _drawMetricChart(labels, metrics) {
+            // Use validity as the "quality score" line matching live training style
+            const vals = metrics.map(m => m.completeness || 0);
+            _drawEpisodeChart('metricChart', labels, vals, '#10b981', 'Completeness');
+        }
+
+        function _drawEpisodeChart(canvasId, labels, values, lineColor, lineLabel) {
+            lineColor = lineColor || '#6366f1';
+            lineLabel = lineLabel || 'Cumulative Reward';
+            const canvas = document.getElementById(canvasId);
+            const rawW = canvas.parentElement.clientWidth - 32;
+            const W = rawW > 50 ? rawW : 400;   // fallback if hidden/0
+            const H = 200;
+            canvas.width  = W * 2; canvas.height = H * 2;
+            canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+            const ctx = canvas.getContext('2d');
+            ctx.scale(2, 2);
+            ctx.clearRect(0, 0, W, H);
+
+            if (values.length < 1) return;
+            const maxV = Math.max(...values.map(Math.abs), 0.01);
+            const minV = Math.min(...values, 0);
+            const range = maxV - minV || 0.01;
+
+            const pad = {l:44, r:12, t:12, b:32};
+            const gW  = W - pad.l - pad.r;
+            const gH  = H - pad.t - pad.b;
+            const n   = values.length;
+
+            // Grid lines
+            ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 0.5;
+            for (let i = 0; i <= 4; i++) {
+                const y = pad.t + gH * (1 - i/4);
+                ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + gW, y); ctx.stroke();
+                ctx.fillStyle = '#9ca3af'; ctx.font = '9px sans-serif'; ctx.textAlign = 'right';
+                const val = minV + (range * i/4);
+                ctx.fillText(val.toFixed(2), pad.l - 5, y + 3);
+            }
+
+            // X-axis labels
+            ctx.fillStyle = '#9ca3af'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+            labels.forEach((l, i) => {
+                if (n <= 10 || i % Math.ceil(n/8) === 0) {
+                    const x = pad.l + (n === 1 ? gW/2 : (i/(n-1)) * gW);
+                    ctx.fillText(l, x, pad.t + gH + 18);
+                }
+            });
+
+            // Gradient fill under line
+            const gradY0 = pad.t;
+            const gradY1 = pad.t + gH;
+            const grad = ctx.createLinearGradient(0, gradY0, 0, gradY1);
+            grad.addColorStop(0, lineColor + '33');
+            grad.addColorStop(1, lineColor + '05');
+            ctx.beginPath();
+            values.forEach((v, i) => {
+                const x = pad.l + (n === 1 ? gW/2 : (i/(n-1)) * gW);
+                const y = pad.t + gH * (1 - (v - minV) / range);
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            });
+            // Close fill to baseline
+            ctx.lineTo(pad.l + (n === 1 ? gW/2 : gW), pad.t + gH);
+            ctx.lineTo(pad.l, pad.t + gH);
+            ctx.closePath();
+            ctx.fillStyle = grad; ctx.fill();
+
+            // Main line
+            ctx.beginPath(); ctx.lineWidth = 2; ctx.strokeStyle = lineColor;
+            ctx.lineJoin = 'round';
+            values.forEach((v, i) => {
+                const x = pad.l + (n === 1 ? gW/2 : (i/(n-1)) * gW);
+                const y = pad.t + gH * (1 - (v - minV) / range);
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            // Dots — last one is green (episode end)
+            values.forEach((v, i) => {
+                const x = pad.l + (n === 1 ? gW/2 : (i/(n-1)) * gW);
+                const y = pad.t + gH * (1 - (v - minV) / range);
+                ctx.beginPath(); ctx.arc(x, y, i === n-1 ? 4 : 2.5, 0, Math.PI*2);
+                ctx.fillStyle = i === n-1 ? '#10b981' : lineColor; ctx.fill();
+                if (i === n-1) {
+                    ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI*2);
+                    ctx.strokeStyle = '#10b98144'; ctx.lineWidth = 1.5; ctx.stroke();
+                }
+            });
+
+            // Legend label top-left
+            ctx.fillStyle = lineColor; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'left';
+            ctx.fillText('● ' + lineLabel, pad.l + 2, pad.t - 2);
+        }
+
+
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
         // Basic heuristic client for demo purposes
         function chooseSimpleAction(obs, stepNum) {
             if (stepNum === 0) {
@@ -615,6 +1069,176 @@ R(t) = base_progress
                 resArea.innerHTML = `<div class="card" style="color:var(--danger)">Failed to evaluate: ${e.message}</div>`;
             }
         }
+<<<<<<< HEAD
+=======
+
+        // ── Feature 1: Explainability Replay ──────────────────────────
+        async function loadReplay() {
+            const status = document.getElementById('explain-status');
+            const area   = document.getElementById('explain-steps');
+            status.textContent = 'Loading...';
+            area.innerHTML = '';
+            try {
+                const res  = await fetch('/api/replay');
+                const data = await res.json();
+                if (!data.steps || data.steps.length === 0) {
+                    status.textContent = 'No replay data — run an episode first (Run Episode panel).';
+                    return;
+                }
+                status.textContent = `Task: ${data.task_id} | ${data.steps.length} steps`;
+                data.steps.forEach(s => {
+                    const rColor = s.reward >= 0 ? '#059669' : '#dc2626';
+                    const compHtml = Object.entries(s.reward_components || {}).map(
+                        ([k,v]) => `<span style="background:#f1f5f9;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.75rem;margin-right:0.3rem">${k}: ${v}</span>`
+                    ).join('');
+                    area.innerHTML += `
+                        <div class="card" style="margin-bottom:1rem;border-left:4px solid ${rColor}">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+                                <strong>Step ${s.step}: ${s.action}</strong>
+                                <span style="color:${rColor};font-weight:700;font-size:1rem">Reward: ${s.reward >= 0 ? '+' : ''}${s.reward}</span>
+                            </div>
+                            <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:0.5rem"><strong>&#128065; Observed:</strong> ${s.observation_summary || '-'}</div>
+                            <div style="font-size:0.85rem;margin-bottom:0.5rem;background:#f0fdf4;padding:0.6rem;border-radius:6px">&#129504; <strong>Reasoning:</strong> ${s.reasoning || '-'}</div>
+                            <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:0.35rem"><strong>Description:</strong> ${s.description}</div>
+                            <div>${compHtml}</div>
+                        </div>`;
+                });
+            } catch(e) { status.textContent = 'Error: ' + e.message; }
+        }
+
+        // ── Feature 2: WebSocket Live Training ────────────────────────
+        let _ws = null;
+        let _epCount = 0;
+        let _chartData = [];
+        let _chartCtx  = null;
+
+        function initChart() {
+            const canvas = document.getElementById('liveChart');
+            if (!canvas) return;
+            _chartCtx = canvas.getContext('2d');
+        }
+
+        function drawLiveChart() {
+            const canvas = document.getElementById('liveChart');
+            if (!canvas || !_chartCtx) return;
+            const W = canvas.parentElement.clientWidth - 32;
+            canvas.width  = W * 2; canvas.height = 400;
+            canvas.style.width = W + 'px'; canvas.style.height = '200px';
+            const ctx = _chartCtx;
+            ctx.scale(2, 2);
+            const w = W, h = 200;
+            ctx.clearRect(0, 0, w, h);
+            if (_chartData.length < 2) return;
+            const maxV  = Math.max(..._chartData.map(d => d.v), 0.1);
+            const pad = {l:40,r:10,t:10,b:30};
+            const gW = w-pad.l-pad.r, gH = h-pad.t-pad.b;
+            ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=0.5;
+            for (let i=0;i<=4;i++) {
+                const y = pad.t + gH*(1-i/4);
+                ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+gW,y); ctx.stroke();
+                ctx.fillStyle='#9ca3af'; ctx.font='9px sans-serif'; ctx.textAlign='right';
+                ctx.fillText((maxV*i/4).toFixed(2), pad.l-4, y+3);
+            }
+            ctx.beginPath(); ctx.lineWidth=2; ctx.strokeStyle='#6366f1';
+            _chartData.forEach((d,i) => {
+                const x = pad.l + (i/(_chartData.length-1))*gW;
+                const y = pad.t + gH*(1 - d.v/maxV);
+                i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+            });
+            ctx.stroke();
+            _chartData.forEach((d,i) => {
+                const x = pad.l + (i/(_chartData.length-1))*gW;
+                const y = pad.t + gH*(1 - d.v/maxV);
+                ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2);
+                ctx.fillStyle = d.ep_end ? '#10b981' : '#6366f1'; ctx.fill();
+            });
+        }
+
+        function connectWS() {
+            const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+            _ws = new WebSocket(`${proto}://${location.host}/ws/train`);
+            _ws.onopen = () => {
+                document.getElementById('ws-status').textContent = 'WebSocket: connected ✓';
+                document.getElementById('ws-status').style.color = '#059669';
+            };
+            _ws.onclose = () => {
+                document.getElementById('ws-status').textContent = 'WebSocket: disconnected';
+                document.getElementById('ws-status').style.color = '#dc2626';
+            };
+            _ws.onmessage = (e) => {
+                const msg = JSON.parse(e.data);
+                if (msg.type === 'step') {
+                    document.getElementById('live-step').textContent   = msg.step;
+                    document.getElementById('live-reward').textContent = msg.cumulative.toFixed(4);
+                    document.getElementById('live-action').textContent = msg.action;
+                    _chartData.push({v: msg.cumulative, ep_end: false});
+                    document.getElementById('live-log').innerHTML = `<div class="timeline-item"><div class="timeline-action">Step ${msg.step}: ${msg.action}</div><div class="timeline-desc">Reward: <span class="${msg.reward>=0?'pos':'neg'}-amount">${msg.reward>=0?'+':''}${msg.reward}</span> | Cumulative: ${msg.cumulative.toFixed(4)}</div></div>` + document.getElementById('live-log').innerHTML;
+                    drawLiveChart();
+                } else if (msg.type === 'episode_end') {
+                    _epCount++;
+                    document.getElementById('live-ep').textContent = _epCount;
+                    _chartData.push({v: msg.final_score, ep_end: true});
+                    drawLiveChart();
+                }
+            };
+        }
+
+        async function startTraining() {
+            if (!_ws || _ws.readyState !== WebSocket.OPEN) {
+                initChart(); connectWS();
+                await new Promise(r => setTimeout(r, 600));
+            }
+            document.getElementById('train-btn').disabled = true;
+            document.getElementById('train-btn').textContent = '⏳ Running...';
+            try {
+                await fetch('/api/train-episode', {method:'POST'});
+            } finally {
+                document.getElementById('train-btn').disabled = false;
+                document.getElementById('train-btn').textContent = '▶ Run Training Episode';
+            }
+        }
+
+        // ── Feature 3: CSV Upload Auto-Debug ──────────────────────────
+        function handleDrop(e) {
+            e.preventDefault();
+            document.getElementById('drop-zone').style.borderColor = 'var(--border-color)';
+            const file = e.dataTransfer.files[0];
+            if (file) uploadCSV(file);
+        }
+
+        async function uploadCSV(file) {
+            if (!file) return;
+            const status  = document.getElementById('upload-status');
+            const summary = document.getElementById('upload-summary');
+            const stepsEl = document.getElementById('upload-steps');
+            const meta    = document.getElementById('upload-meta');
+            status.textContent = `Uploading ${file.name}...`;
+            summary.style.display = 'none';
+            stepsEl.innerHTML = '';
+            const form = new FormData();
+            form.append('file', file);
+            try {
+                const res  = await fetch('/api/upload-debug', {method:'POST', body:form});
+                const data = await res.json();
+                if (data.status === 'error') { status.textContent = '❌ ' + data.message; return; }
+                status.textContent = '✅ Debug complete!';
+                const nullInfo = Object.entries(data.null_counts||{}).filter(([,v])=>v>0).map(([k,v])=>`${k}:${v}`).join(', ');
+                meta.innerHTML = `<div><strong>File:</strong> ${data.filename}</div><div><strong>Rows:</strong> ${data.rows}</div><div><strong>Columns:</strong> ${data.columns.join(', ')}</div><div><strong>Nulls:</strong> ${nullInfo||'None'}</div><div><strong>Duplicates:</strong> ${data.duplicate_count}</div><div><strong>Final Score:</strong> <span style="color:var(--success);font-weight:700">${data.final_score}</span></div>`;
+                summary.style.display = 'block';
+                data.steps.forEach(s => {
+                    const rColor = (s.reward||0)>=0 ? '#059669' : '#dc2626';
+                    stepsEl.innerHTML += `<div class="card" style="margin-bottom:0.75rem;border-left:4px solid ${rColor}">
+                        <div style="display:flex;justify-content:space-between;margin-bottom:0.5rem">
+                            <strong>Step ${s.step}: ${s.action}</strong>
+                            <span style="color:${rColor};font-weight:600">${(s.reward||0)>=0?'+':''}${s.reward||0}</span>
+                        </div>
+                        <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:0.35rem">&#128065; ${s.observation_summary||'-'}</div>
+                        <div style="font-size:0.85rem;background:#f0fdf4;padding:0.5rem;border-radius:6px">&#129504; ${s.reasoning||'-'}</div>
+                        <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.35rem">${s.description||''}</div></div>`;
+                });
+            } catch(e) { status.textContent = '❌ Error: ' + e.message; }
+        }
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
     </script>
 </body>
 </html>"""
