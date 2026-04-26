@@ -199,6 +199,11 @@ training_report.html
 reward_curves.html
 all_tasks_comparison.html
 reward_curve.json
+<<<<<<< HEAD
+=======
+benchmark_report.html
+benchmark_report.json
+>>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
 replays/
 ppo_checkpoints/
 uv.lock
