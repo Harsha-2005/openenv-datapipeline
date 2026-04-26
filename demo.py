@@ -21,7 +21,6 @@ def get_demo_html() -> str:
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-<<<<<<< HEAD
             --bg-primary: #0a0e1a;
             --bg-card: #1a1f35;
             --text-primary: #f1f5f9;
@@ -177,7 +176,6 @@ def get_demo_html() -> str:
 </div>
 
 <script>
-=======
             --bg-color: #f9fafb; --text-color: #111827; --text-muted: #6b7280;
             --border-color: #e5e7eb; --primary-color: #2563eb; --primary-hover: #1d4ed8;
             --bg-card: #ffffff; --success: #059669; --danger: #dc2626; --navbar-height: 56px;
@@ -395,14 +393,11 @@ def get_demo_html() -> str:
 
 <script>
 // Tab switching
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
 function switchTab(tabId) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     document.querySelector(`.tab[onclick="switchTab('${tabId}')"]`).classList.add('active');
     document.getElementById(`tab-${tabId}`).classList.add('active');
-<<<<<<< HEAD
-=======
     if (tabId === 'training' && !window._chartDrawn) drawChart();
 }
 
@@ -468,7 +463,6 @@ function drawChart() {
     // X label
     ctx.fillStyle='#6b7280'; ctx.font='10px Inter'; ctx.textAlign='center';
     ctx.fillText('Episodes', padL+gW/2, H-4);
->>>>>>> 03d62d9 (updated the demo and dashboard file and added the training using the grpo)
 }
 </script>
 </body>
